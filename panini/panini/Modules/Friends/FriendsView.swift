@@ -165,13 +165,21 @@ private struct FriendRow: View {
 
             Spacer()
 
-            VStack(alignment: .trailing, spacing: 2) {
+            VStack(alignment: .trailing, spacing: 4) {
                 Text("\(friendship.friendOwnedCount)/670")
                     .monoStyle(size: 12)
                     .foregroundStyle(theme.ink)
                 Text("stickers")
                     .bodyStyle(size: 11)
                     .foregroundStyle(theme.inkMuted)
+                if friendship.tradeMatchCount > 0 {
+                    Text("\(friendship.tradeMatchCount) trade\(friendship.tradeMatchCount == 1 ? "" : "s")")
+                        .bodyStyle(size: 11, weight: .semibold)
+                        .foregroundStyle(theme.primaryInk)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(theme.primary, in: Capsule())
+                }
             }
         }
         .padding(.vertical, 4)

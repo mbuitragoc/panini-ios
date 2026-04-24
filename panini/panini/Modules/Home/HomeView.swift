@@ -13,6 +13,9 @@ struct HomeView: View {
     @Query(sort: \UserCollection.updatedAt, order: .reverse)
     private var allCollections: [UserCollection]
 
+    @Query(filter: #Predicate<Friendship> { $0.status == "accepted" })
+    private var acceptedFriendships: [Friendship]
+
     @State private var selectedTeam: String? = nil
 
     // MARK: - Derived stats
@@ -23,6 +26,10 @@ struct HomeView: View {
     private var missingCount: Int { allStickers.count - ownedCount }
     private var dupesCount: Int {
         allStickers.reduce(0) { $0 + max(0, ($1.collection?.quantityOwned ?? 0) - 1) }
+    }
+
+    private var totalTradeOpportunities: Int {
+        acceptedFriendships.reduce(0) { $0 + $1.tradeMatchCount }
     }
 
     private var recentAdds: [Sticker] {
@@ -40,6 +47,7 @@ struct HomeView: View {
                 statsStrip
                 scanCTA
                 if !recentAdds.isEmpty { recentAddsSection }
+                if totalTradeOpportunities > 0 { tradeTeaserSection }
                 nationsSection
             }
             .padding(.top, 16)
@@ -120,6 +128,47 @@ struct HomeView: View {
                 .padding(.vertical, 4)
             }
         }
+    }
+
+    // MARK: - Trade teaser
+
+    private var tradeTeaserSection: some View {
+        Button { router.selectedTab = .friends } label: {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(theme.primary.opacity(0.15))
+                        .frame(width: 48, height: 48)
+                    Image(systemName: "arrow.left.arrow.right")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(theme.primary)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(totalTradeOpportunities) trade opportunit\(totalTradeOpportunities == 1 ? "y" : "ies")")
+                        .bodyStyle(size: 16, weight: .semibold)
+                        .foregroundStyle(theme.ink)
+                    Text("with \(acceptedFriendships.filter { $0.tradeMatchCount > 0 }.count) friend\(acceptedFriendships.filter { $0.tradeMatchCount > 0 }.count == 1 ? "" : "s")")
+                        .bodyStyle(size: 13)
+                        .foregroundStyle(theme.inkMuted)
+                }
+
+                Spacer()
+
+                Text("See trades →")
+                    .bodyStyle(size: 13, weight: .medium)
+                    .foregroundStyle(theme.primary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .background(theme.surface, in: RoundedRectangle(cornerRadius: 14))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(theme.primary.opacity(0.2), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 16)
     }
 
     // MARK: - Nations grid

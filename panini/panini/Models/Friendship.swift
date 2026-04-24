@@ -11,6 +11,7 @@ final class Friendship {
     var status: String
     var sentByMe: Bool
     var updatedAt: Date
+    var tradeMatchCount: Int
 
     init(
         userID: String,
@@ -20,7 +21,8 @@ final class Friendship {
         friendOwnedCount: Int = 0,
         status: String = "pending",
         sentByMe: Bool = true,
-        updatedAt: Date = .now
+        updatedAt: Date = .now,
+        tradeMatchCount: Int = 0
     ) {
         self.userID = userID
         self.friendID = friendID
@@ -30,5 +32,6 @@ final class Friendship {
         self.status = status
         self.sentByMe = sentByMe
         self.updatedAt = updatedAt
+        self.tradeMatchCount = tradeMatchCount
     }
 }

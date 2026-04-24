@@ -16,6 +16,7 @@ struct FriendProfileView: View {
     @State private var friendCollection: [FriendCollectionItem]
     @State private var isLoading = false
     @State private var loadError = false
+    @State private var suggestionIndex = 0
 
     // Convenience init for previews with pre-loaded data
     init(friendship: Friendship, previewCollection: [FriendCollectionItem] = []) {
@@ -50,6 +51,26 @@ struct FriendProfileView: View {
 
     private var hasTrades: Bool { !theyHaveINeed.isEmpty || !youHaveTheyNeed.isEmpty }
 
+    private var suggestedPairs: [SuggestedTrade] {
+        guard !friendCollection.isEmpty else { return [] }
+        let myWishlist = allStickers.filter { $0.collection?.wishlisted == true }.map(\.id)
+        let myDupes = allStickers.filter {
+            ($0.collection?.quantityOwned ?? 0) > 1 && !($0.collection?.blacklisted ?? false)
+        }.map(\.id)
+        let theirWishlist = friendCollection.filter { $0.wishlisted }.map(\.stickerID)
+        let theirDupes = friendCollection.filter { $0.quantityOwned > 1 && !$0.blacklisted }.map(\.stickerID)
+        return StickerMatcher.match(
+            myWishlist: myWishlist,
+            myAvailableDupes: myDupes,
+            theirWishlist: theirWishlist,
+            theirAvailableDupes: theirDupes
+        )
+    }
+
+    private func stickerByID(_ id: String) -> Sticker? {
+        allStickers.first { $0.id == id }
+    }
+
     private var totalStickers: Int { allStickers.count > 0 ? allStickers.count : 670 }
     private var completionPct: Double {
         Double(friendship.friendOwnedCount) / Double(totalStickers)
@@ -78,6 +99,9 @@ struct FriendProfileView: View {
                         tradeStrips
                     } else {
                         emptyTradeState
+                    }
+                    if !suggestedPairs.isEmpty {
+                        suggestedPairSection
                     }
                 }
             }
@@ -246,6 +270,106 @@ struct FriendProfileView: View {
         .padding(.top, 4)
     }
 
+    // MARK: - Suggested pair carousel
+
+    private var suggestedPairSection: some View {
+        let clampedIndex = min(suggestionIndex, suggestedPairs.count - 1)
+        let pair = suggestedPairs[clampedIndex]
+        let giveSticker = stickerByID(pair.give)
+        let receiveSticker = stickerByID(pair.receive)
+        let name = friendship.friendUsername.isEmpty
+            ? friendship.friendHandle
+            : friendship.friendUsername.components(separatedBy: " ").first ?? friendship.friendHandle
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("SUGGESTED · FAIR TRADE")
+                        .monoStyle(size: 10)
+                        .foregroundStyle(theme.primary)
+                    Text("\(clampedIndex + 1) of \(suggestedPairs.count)")
+                        .bodyStyle(size: 12)
+                        .foregroundStyle(theme.inkMuted)
+                }
+                Spacer()
+            }
+
+            HStack(spacing: 16) {
+                VStack(spacing: 6) {
+                    Text("You give")
+                        .bodyStyle(size: 11)
+                        .foregroundStyle(theme.inkMuted)
+                    if let s = giveSticker {
+                        StickerCard(sticker: s, collection: s.collection, width: 88)
+                    } else {
+                        stickerIDPlaceholder(pair.give)
+                    }
+                }
+
+                Image(systemName: "arrow.left.arrow.right")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(theme.inkMuted)
+                    .frame(maxWidth: .infinity)
+
+                VStack(spacing: 6) {
+                    Text("You get")
+                        .bodyStyle(size: 11)
+                        .foregroundStyle(theme.inkMuted)
+                    if let s = receiveSticker {
+                        StickerCard(sticker: s, collection: s.collection, width: 88)
+                    } else {
+                        stickerIDPlaceholder(pair.receive)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity)
+
+            HStack(spacing: 10) {
+                if suggestionIndex < suggestedPairs.count - 1 {
+                    Button {
+                        withAnimation(.easeInOut) { suggestionIndex += 1 }
+                    } label: {
+                        Text("Skip")
+                            .bodyStyle(size: 14, weight: .medium)
+                            .foregroundStyle(theme.inkSoft)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(theme.chip, in: RoundedRectangle(cornerRadius: 10))
+                    }
+                }
+
+                NavigationLink {
+                    ProposeTradeView(
+                        friendID: friendship.friendID,
+                        offeredStickerIDs: [pair.give],
+                        requestedStickerIDs: [pair.receive]
+                    )
+                } label: {
+                    Text("Accept with \(name)")
+                        .bodyStyle(size: 14, weight: .semibold)
+                        .foregroundStyle(theme.primaryInk)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(theme.primary, in: RoundedRectangle(cornerRadius: 10))
+                }
+            }
+        }
+        .padding(16)
+        .background(theme.surface, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(theme.primary.opacity(0.25), lineWidth: 1)
+        )
+    }
+
+    private func stickerIDPlaceholder(_ id: String) -> some View {
+        Text(id)
+            .monoStyle(size: 11)
+            .foregroundStyle(theme.inkMuted)
+            .frame(width: 88, height: 110)
+            .background(theme.chip, in: RoundedRectangle(cornerRadius: 10))
+    }
+
     // MARK: - State views
 
     private var emptyTradeState: some View {
@@ -301,7 +425,23 @@ struct FriendProfileView: View {
         isLoading = true
         loadError = false
         do {
-            friendCollection = try await friendService.fetchFriendCollection(friendID: friendship.friendID)
+            let collection = try await friendService.fetchFriendCollection(friendID: friendship.friendID)
+            friendCollection = collection
+            suggestionIndex = 0
+            // Cache match count on the Friendship record so the home screen teaser
+            // and friends list can show real counts without re-fetching.
+            let myWishlist = allStickers.filter { $0.collection?.wishlisted == true }.map(\.id)
+            let myDupes = allStickers.filter {
+                ($0.collection?.quantityOwned ?? 0) > 1 && !($0.collection?.blacklisted ?? false)
+            }.map(\.id)
+            let theirWishlist = collection.filter { $0.wishlisted }.map(\.stickerID)
+            let theirDupes = collection.filter { $0.quantityOwned > 1 && !$0.blacklisted }.map(\.stickerID)
+            friendship.tradeMatchCount = StickerMatcher.match(
+                myWishlist: myWishlist,
+                myAvailableDupes: myDupes,
+                theirWishlist: theirWishlist,
+                theirAvailableDupes: theirDupes
+            ).count
         } catch {
             loadError = friendCollection.isEmpty
         }
