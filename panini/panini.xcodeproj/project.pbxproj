@@ -21,9 +21,22 @@
 		A1B2C3D82F9B0CC000427DA8 /* paniniTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = paniniTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		152D740A2F9BC83F00427DA8 /* Exceptions for "panini" folder in "panini" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 152D70ED2F9B0CC000427DA8 /* panini */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		152D70F02F9B0CC000427DA8 /* panini */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				152D740A2F9BC83F00427DA8 /* Exceptions for "panini" folder in "panini" target */,
+			);
 			path = panini;
 			sourceTree = "<group>";
 		};
@@ -324,6 +337,7 @@
 				DEVELOPMENT_TEAM = Q8578WHHUX;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = panini/Info.plist;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Point at the back of a sticker to scan its ID.";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Panini uses local networking to find nearby friends for the tap-to-add feature.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -359,6 +373,7 @@
 				DEVELOPMENT_TEAM = Q8578WHHUX;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = panini/Info.plist;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Point at the back of a sticker to scan its ID.";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Panini uses local networking to find nearby friends for the tap-to-add feature.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

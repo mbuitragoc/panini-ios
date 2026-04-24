@@ -9,6 +9,13 @@ struct UserSearchResult: Decodable, Identifiable {
     let handle: String
 }
 
+struct FriendCollectionItem: Decodable {
+    let stickerID: String
+    let quantityOwned: Int
+    let wishlisted: Bool
+    let blacklisted: Bool
+}
+
 private struct FriendRequestBody: Encodable {
     let friendId: String
 }
@@ -48,5 +55,9 @@ final class FriendService {
             method: "PUT",
             body: RespondRequestBody(accept: accept)
         )
+    }
+
+    func fetchFriendCollection(friendID: String) async throws -> [FriendCollectionItem] {
+        return try await apiClient.request("/v1/friends/\(friendID)/collection")
     }
 }
