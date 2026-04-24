@@ -20,6 +20,7 @@ struct ScanView: View {
     @State private var mode: ScanMode = .back
     @State private var pending: String? = nil         // stickerID awaiting confirm
     @State private var hintMessage: String? = nil
+    @State private var showManualAdd = false
 
     var body: some View {
         ZStack {
@@ -35,6 +36,14 @@ struct ScanView: View {
         }
         .navigationTitle("Scan")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button { showManualAdd = true } label: {
+                    Image(systemName: "magnifyingglass")
+                }
+            }
+        }
+        .sheet(isPresented: $showManualAdd) { ManualAddView() }
     }
 
     // MARK: Scanner

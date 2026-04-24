@@ -4,6 +4,7 @@ import SwiftData
 // MARK: - ScanConfirmView
 
 struct ScanConfirmView: View {
+    /// Either a full sticker ID ("FRA-20") or a country code from front-scan ("FRA").
     let stickerID: String
 
     @Environment(\.dismiss) private var dismiss
@@ -11,91 +12,167 @@ struct ScanConfirmView: View {
     @Environment(\.theme) private var theme
     @Environment(SyncEngine.self) private var syncEngine
 
-    @Query private var allStickers: [Sticker]
+    @Query(sort: [SortDescriptor(\Sticker.countryCode), SortDescriptor(\Sticker.stickerNumber)])
+    private var allStickers: [Sticker]
 
-    private var sticker: Sticker? { allStickers.first { $0.id == stickerID } }
+    // Set when the user picks a player in country-code mode.
+    @State private var resolvedID: String? = nil
+    // Drives navigationDestination to the reveal screen.
+    @State private var revealSticker: Sticker? = nil
+    // Shown briefly when a duplicate is added, then auto-dismiss fires.
+    @State private var duplicateAdded = false
+
+    // MARK: - Derived state
+
+    /// The sticker to display — either the resolved pick or the direct full-ID match.
+    private var sticker: Sticker? {
+        let id = resolvedID ?? stickerID
+        return allStickers.first { $0.id == id }
+    }
+
+    /// True when stickerID carries no "-", meaning parseFront returned a country code.
+    private var isCountryMode: Bool {
+        !stickerID.contains("-") && resolvedID == nil
+    }
+
+    /// All stickers for the country when in country mode.
+    private var countryStickers: [Sticker] {
+        allStickers.filter { $0.countryCode == stickerID }
+    }
+
     private var alreadyOwned: Bool { (sticker?.collection?.quantityOwned ?? 0) > 0 }
+
+    // MARK: - Body
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 28) {
-                    if let sticker {
-                        heroCard(sticker)
-                        infoSection(sticker)
-                        if alreadyOwned { duplicateNotice }
-                        addButton(sticker)
-                    } else {
-                        notFound
-                    }
+            Group {
+                if duplicateAdded {
+                    duplicateFeedback
+                } else if isCountryMode {
+                    countryPicker
+                } else if let sticker {
+                    confirmContent(sticker)
+                } else {
+                    notFound
                 }
-                .padding(24)
             }
             .background(theme.bg)
-            .navigationTitle("Add sticker")
+            .navigationTitle(isCountryMode ? "Which player?" : "Add sticker")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Scan again") { dismiss() }
+                    Button(isCountryMode ? "Cancel" : "Scan again") { dismiss() }
                         .bodyStyle(size: 15)
                 }
+            }
+            .navigationDestination(item: $revealSticker) { s in
+                StickerRevealView(sticker: s)
+                    .navigationBarBackButtonHidden()
             }
         }
     }
 
-    // MARK: - Hero card
+    // MARK: - Country picker (front-scan mode)
+
+    private var countryPicker: some View {
+        ScrollView {
+            LazyVStack(spacing: 12) {
+                Text("Front scan matched \(countryStickers.first?.nationalTeam ?? stickerID). Tap the right player.")
+                    .bodyStyle(size: 14)
+                    .foregroundStyle(theme.inkMuted)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+                    .padding(.top, 8)
+
+                ForEach(countryStickers, id: \.id) { s in
+                    Button { resolvedID = s.id } label: {
+                        countryRow(s)
+                    }
+                    .padding(.horizontal, 16)
+                }
+            }
+            .padding(.vertical, 16)
+        }
+    }
+
+    private func countryRow(_ s: Sticker) -> some View {
+        let preview = UserCollection(userID: "", stickerID: s.id, quantityOwned: 1)
+        return HStack(spacing: 14) {
+            StickerCard(sticker: s, collection: preview, width: 60)
+
+            VStack(alignment: .leading, spacing: 3) {
+                if let name = s.playerName {
+                    Text(name)
+                        .bodyStyle(size: 15, weight: .medium)
+                        .foregroundStyle(theme.ink)
+                }
+                if let pos = s.position {
+                    Text(pos)
+                        .bodyStyle(size: 13)
+                        .foregroundStyle(theme.inkMuted)
+                }
+                Text(s.id)
+                    .monoStyle(size: 11)
+                    .foregroundStyle(theme.inkMuted)
+            }
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(theme.inkMuted)
+        }
+        .padding(14)
+        .background(theme.surface, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    // MARK: - Single sticker confirm
 
     @ViewBuilder
-    private func heroCard(_ sticker: Sticker) -> some View {
-        // Show the card in full colour even if not yet owned.
-        let preview = UserCollection(
-            userID: "",
-            stickerID: sticker.id,
-            quantityOwned: 1
-        )
-        StickerCard(sticker: sticker, collection: preview, width: 180)
+    private func confirmContent(_ s: Sticker) -> some View {
+        ScrollView {
+            VStack(spacing: 28) {
+                heroCard(s)
+                infoSection(s)
+                if alreadyOwned { duplicateNotice }
+                addButton(s)
+            }
+            .padding(24)
+        }
+    }
+
+    private func heroCard(_ s: Sticker) -> some View {
+        let preview = UserCollection(userID: "", stickerID: s.id, quantityOwned: 1)
+        return StickerCard(sticker: s, collection: preview, width: 180)
             .shadow(color: .black.opacity(0.18), radius: 12, x: 0, y: 6)
     }
 
-    // MARK: - Info section
-
-    @ViewBuilder
-    private func infoSection(_ sticker: Sticker) -> some View {
+    private func infoSection(_ s: Sticker) -> some View {
         VStack(spacing: 6) {
-            if let name = sticker.playerName {
+            if let name = s.playerName {
                 Text(name)
                     .displayStyle(size: 26)
                     .foregroundStyle(theme.ink)
                     .multilineTextAlignment(.center)
             }
-
             HStack(spacing: 8) {
-                Text(sticker.nationalTeam)
+                Text(s.nationalTeam)
                     .bodyStyle(size: 14, weight: .medium)
                     .foregroundStyle(theme.inkSoft)
-
-                if let pos = sticker.position {
-                    Text("·")
-                        .foregroundStyle(theme.inkMuted)
-                    Text(pos)
-                        .bodyStyle(size: 14)
-                        .foregroundStyle(theme.inkMuted)
+                if let pos = s.position {
+                    Text("·").foregroundStyle(theme.inkMuted)
+                    Text(pos).bodyStyle(size: 14).foregroundStyle(theme.inkMuted)
                 }
             }
-
-            Text(sticker.id)
+            Text(s.id)
                 .monoStyle(size: 13)
                 .foregroundStyle(theme.inkMuted)
                 .padding(.top, 2)
         }
     }
 
-    // MARK: - Duplicate notice
-
     private var duplicateNotice: some View {
         HStack(spacing: 8) {
             Image(systemName: "square.on.square")
-                .font(.system(size: 14))
             Text("Already in your collection — this will be a duplicate")
                 .bodyStyle(size: 13)
         }
@@ -105,13 +182,9 @@ struct ScanConfirmView: View {
         .background(theme.chip, in: RoundedRectangle(cornerRadius: 10))
     }
 
-    // MARK: - Add button
-
     @ViewBuilder
-    private func addButton(_ sticker: Sticker) -> some View {
-        Button {
-            save(sticker)
-        } label: {
+    private func addButton(_ s: Sticker) -> some View {
+        Button { save(s) } label: {
             Text(alreadyOwned ? "Add duplicate" : "Add to collection")
                 .bodyStyle(size: 17, weight: .semibold)
                 .foregroundStyle(theme.primaryInk)
@@ -121,7 +194,25 @@ struct ScanConfirmView: View {
         }
     }
 
-    // MARK: - Not found fallback
+    // MARK: - Duplicate feedback screen
+
+    private var duplicateFeedback: some View {
+        VStack(spacing: 16) {
+            Spacer()
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 52))
+                .foregroundStyle(theme.success)
+            Text("Already in your collection — duplicate added")
+                .bodyStyle(size: 16, weight: .medium)
+                .foregroundStyle(theme.ink)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - Not found
 
     private var notFound: some View {
         VStack(spacing: 12) {
@@ -138,21 +229,29 @@ struct ScanConfirmView: View {
 
     // MARK: - Save
 
-    private func save(_ sticker: Sticker) {
-        if let record = sticker.collection {
+    private func save(_ s: Sticker) {
+        if let record = s.collection {
             record.quantityOwned += 1
             record.updatedAt = .now
+            try? context.save()
+            syncEngine.syncAfterWrite(context: context)
+
+            // Duplicate path: brief feedback, then auto-dismiss.
+            withAnimation { duplicateAdded = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { dismiss() }
         } else {
             context.insert(UserCollection(
                 userID: "",
-                stickerID: sticker.id,
+                stickerID: s.id,
                 quantityOwned: 1,
                 firstAcquiredAt: .now,
                 updatedAt: .now
             ))
+            try? context.save()
+            syncEngine.syncAfterWrite(context: context)
+
+            // New sticker path: navigate to reveal.
+            revealSticker = s
         }
-        try? context.save()
-        syncEngine.syncAfterWrite(context: context)
-        dismiss()
     }
 }
