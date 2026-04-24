@@ -30,10 +30,10 @@ final class StickerStore {
                 stickerNumber: row.stickerNumber,
                 type: row.type,
                 playerName: row.playerName,
-                nationalTeam: row.nationalTeam,
                 club: row.club,
                 clubCountry: row.clubCountry,
-                position: row.position
+                position: row.position,
+                nationalTeam: row.nationalTeam
             ))
         }
         try? context.save()
@@ -43,10 +43,9 @@ final class StickerStore {
     // MARK: - Private
 
     private struct Row {
-        let id, countryCode: String
+        let id, countryCode, type, nationalTeam: String
         let stickerNumber: Int
-        let type: String
-        let playerName, position, nationalTeam, club, clubCountry: String?
+        let playerName, position, club, clubCountry: String?
     }
 
     private func readBundledSQLite() -> [Row]? {
@@ -76,11 +75,11 @@ final class StickerStore {
             rows.append(Row(
                 id:            col(stmt, 0) ?? "",
                 countryCode:   col(stmt, 1) ?? "",
-                stickerNumber: Int(sqlite3_column_int(stmt, 2)),
                 type:          col(stmt, 3) ?? "player",
+                nationalTeam:  col(stmt, 6) ?? "",
+                stickerNumber: Int(sqlite3_column_int(stmt, 2)),
                 playerName:    col(stmt, 4),
                 position:      col(stmt, 5),
-                nationalTeam:  col(stmt, 6) ?? "",
                 club:          col(stmt, 7),
                 clubCountry:   col(stmt, 8)
             ))
