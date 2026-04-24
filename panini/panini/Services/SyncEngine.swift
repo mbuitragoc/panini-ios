@@ -40,6 +40,7 @@ private struct FriendshipSyncItem: Decodable {
     let friendHandle: String
     let friendOwnedCount: Int
     let status: String
+    let sentByMe: Bool
     let updatedAt: Date
 }
 
@@ -199,6 +200,7 @@ final class SyncEngine {
                 friendHandle: $0.friendHandle,
                 friendOwnedCount: $0.friendOwnedCount,
                 status: $0.status,
+                sentByMe: $0.sentByMe,
                 updatedAt: $0.updatedAt
             )
         }
@@ -207,12 +209,13 @@ final class SyncEngine {
 
         for record in diff.toInsert {
             context.insert(Friendship(
-                userID: "",   // userID is not in the sync record; set at write time
+                userID: "",
                 friendID: record.friendID,
                 friendUsername: record.friendUsername,
                 friendHandle: record.friendHandle,
                 friendOwnedCount: record.friendOwnedCount,
                 status: record.status,
+                sentByMe: record.sentByMe,
                 updatedAt: record.updatedAt
             ))
         }
@@ -223,6 +226,7 @@ final class SyncEngine {
             local.friendHandle = record.friendHandle
             local.friendOwnedCount = record.friendOwnedCount
             local.status = record.status
+            local.sentByMe = record.sentByMe
             local.updatedAt = record.updatedAt
         }
     }

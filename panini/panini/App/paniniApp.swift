@@ -32,6 +32,7 @@ struct paniniApp: App {
     private let syncEngine: SyncEngine
     private let authService: AuthService
     private let stickerStore: StickerStore
+    private let friendService: FriendService
 
     init() {
         let apiClient = APIClient()
@@ -40,6 +41,7 @@ struct paniniApp: App {
         self.syncEngine = SyncEngine(apiClient: apiClient)
         self.authService = AuthService(apiClient: apiClient)
         self.stickerStore = StickerStore()
+        self.friendService = FriendService(apiClient: apiClient)
     }
 
     var body: some Scene {
@@ -49,7 +51,8 @@ struct paniniApp: App {
                 apiClient: apiClient,
                 syncEngine: syncEngine,
                 authService: authService,
-                stickerStore: stickerStore
+                stickerStore: stickerStore,
+                friendService: friendService
             )
         }
     }
@@ -64,6 +67,7 @@ private struct AppContent: View {
     let syncEngine: SyncEngine
     let authService: AuthService
     let stickerStore: StickerStore
+    let friendService: FriendService
 
     @Environment(\.scenePhase) private var scenePhase
     @State private var containerResult: Result<ModelContainer, Error>?
@@ -81,6 +85,7 @@ private struct AppContent: View {
                     .environment(syncEngine)
                     .environment(authService)
                     .environment(stickerStore)
+                    .environment(friendService)
                     .modelContainer(container)
                     .task { await restoreSession() }
                     .task { stickerStore.seedIfNeeded(context: container.mainContext) }
@@ -89,6 +94,9 @@ private struct AppContent: View {
                         if phase == .active && router.isAuthenticated {
                             Task { await syncEngine.sync(context: container.mainContext) }
                         }
+                    }
+                    .onOpenURL { url in
+                        handleDeepLink(url, container: container)
                     }
             case .failure(let error):
                 ModelContainerErrorView(error: error)
@@ -109,6 +117,20 @@ private struct AppContent: View {
             return .success(container)
         } catch {
             return .failure(error)
+        }
+    }
+
+    /// Handles `panini://add-friend/<userID>` deep links.
+    private func handleDeepLink(_ url: URL, container: ModelContainer) {
+        guard url.scheme == "panini",
+              url.host == "add-friend",
+              let friendID = url.pathComponents.dropFirst().first,
+              !friendID.isEmpty
+        else { return }
+
+        Task {
+            try? await friendService.sendFriendRequest(friendID: friendID)
+            syncEngine.syncAfterWrite(context: container.mainContext)
         }
     }
 

@@ -36,6 +36,7 @@ enum SyncDiffEngine {
         let friendHandle: String
         let friendOwnedCount: Int
         let status: String
+        let sentByMe: Bool
         let updatedAt: Date
     }
 

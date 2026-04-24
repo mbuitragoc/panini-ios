@@ -9,6 +9,7 @@ final class Friendship {
     var friendHandle: String
     var friendOwnedCount: Int
     var status: String
+    var sentByMe: Bool
     var updatedAt: Date
 
     init(
@@ -18,6 +19,7 @@ final class Friendship {
         friendHandle: String,
         friendOwnedCount: Int = 0,
         status: String = "pending",
+        sentByMe: Bool = true,
         updatedAt: Date = .now
     ) {
         self.userID = userID
@@ -26,6 +28,7 @@ final class Friendship {
         self.friendHandle = friendHandle
         self.friendOwnedCount = friendOwnedCount
         self.status = status
+        self.sentByMe = sentByMe
         self.updatedAt = updatedAt
     }
 }
