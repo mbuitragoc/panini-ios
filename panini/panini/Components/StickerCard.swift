@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - Team colour palette
 
-private let teamGradients: [String: [Color]] = [
+let teamGradients: [String: [Color]] = [
     "ARG": [Color(hex: "74ACDF"), Color(hex: "FFFFFF")],
     "AUS": [Color(hex: "00843D"), Color(hex: "FFCD00")],
     "BEL": [Color(hex: "EF3340"), Color(hex: "000000")],
@@ -53,7 +53,7 @@ private let teamGradients: [String: [Color]] = [
     "ZIM": [Color(hex: "006400"), Color(hex: "FFD200")]
 ]
 
-private func teamGradient(for code: String) -> [Color] {
+func teamGradient(for code: String) -> [Color] {
     teamGradients[code] ?? [Color(hex: "6B6B6B"), Color(hex: "3A3A3A")]
 }
 

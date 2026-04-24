@@ -1,41 +1,37 @@
 import SwiftUI
 
-/// Collection screen with Album / Grid segment toggle.
+// MARK: - CollectionView
+
 struct CollectionView: View {
     @Environment(\.theme) private var theme
-    @State private var selectedSegment: CollectionSegment = .album
+    @State private var mode: CollectionMode = .album
 
-    enum CollectionSegment: String, CaseIterable {
+    enum CollectionMode: String, CaseIterable {
         case album = "Album"
-        case grid = "Grid"
+        case grid  = "Grid"
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            Picker("View", selection: $selectedSegment) {
-                ForEach(CollectionSegment.allCases, id: \.self) { segment in
-                    Text(segment.rawValue).tag(segment)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding()
-
-            switch selectedSegment {
-            case .album:
-                AlbumView()
-            case .grid:
-                GridView()
+        Group {
+            switch mode {
+            case .album: AlbumView()
+            case .grid:  GridView()
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(theme.bg)
-        .navigationTitle("")
+        .navigationTitle(mode == .album ? "Album" : "Collection")
         .navigationBarTitleDisplayMode(.inline)
-    }
-}
-
-#Preview {
-    NavigationStack {
-        CollectionView()
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Picker("View", selection: $mode) {
+                    ForEach(CollectionMode.allCases, id: \.self) { m in
+                        Label(m.rawValue, systemImage: m == .album ? "book.pages" : "square.grid.2x2")
+                            .tag(m)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 120)
+            }
+        }
     }
 }
