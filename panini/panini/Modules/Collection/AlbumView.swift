@@ -18,7 +18,9 @@ struct AlbumView: View {
     private var allStickers: [Sticker]
 
     private var teams: [AlbumTeamData] {
-        Dictionary(grouping: allStickers, by: \.countryCode)
+        var seen = Set<String>()
+        let unique = allStickers.filter { seen.insert($0.id).inserted }
+        return Dictionary(grouping: unique, by: \.countryCode)
             .map { code, stickers in
                 AlbumTeamData(id: code, name: stickers.first?.nationalTeam ?? code, stickers: stickers)
             }
@@ -150,10 +152,14 @@ struct TeamAlbumView: View {
         )
     }
 
+    private var uniqueStickers: [Sticker] {
+        var seen = Set<String>()
+        return stickers.filter { seen.insert($0.id).inserted }
+    }
     private var teamName: String { stickers.first?.nationalTeam ?? countryCode }
-    private var ownedCount: Int { stickers.filter { ($0.collection?.quantityOwned ?? 0) > 0 }.count }
+    private var ownedCount: Int { uniqueStickers.filter { ($0.collection?.quantityOwned ?? 0) > 0 }.count }
     private var completionPct: Int {
-        stickers.isEmpty ? 0 : (ownedCount * 100) / stickers.count
+        uniqueStickers.isEmpty ? 0 : (ownedCount * 100) / uniqueStickers.count
     }
 
     private let hPad: CGFloat = 16
@@ -176,7 +182,7 @@ struct TeamAlbumView: View {
 
                         let cols = Array(repeating: GridItem(.fixed(cardWidth), spacing: spacing), count: 4)
                         LazyVGrid(columns: cols, spacing: spacing) {
-                            ForEach(stickers, id: \.id) { sticker in
+                            ForEach(uniqueStickers, id: \.id) { sticker in
                                 NavigationLink(value: sticker) {
                                     StickerCard(
                                         sticker: sticker,
@@ -215,7 +221,7 @@ struct TeamAlbumView: View {
                 .displayStyle(size: 20)
                 .foregroundStyle(theme.ink)
                 .multilineTextAlignment(.center)
-            Text("\(completionPct)% complete · \(ownedCount)/\(stickers.count)")
+            Text("\(completionPct)% complete · \(ownedCount)/\(uniqueStickers.count)")
                 .bodyStyle(size: 13)
                 .foregroundStyle(theme.inkMuted)
         }

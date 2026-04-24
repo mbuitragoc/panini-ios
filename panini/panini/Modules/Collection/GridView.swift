@@ -29,7 +29,9 @@ struct GridView: View {
     // MARK: - Filtering
 
     private var filtered: [Sticker] {
-        allStickers.filter { s in
+        var seen = Set<String>()
+        return allStickers.filter { s in
+            guard seen.insert(s.id).inserted else { return false }
             let statusOK: Bool = {
                 switch statusFilter {
                 case .all:        return true
