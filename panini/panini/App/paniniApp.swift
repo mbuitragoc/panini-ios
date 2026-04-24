@@ -136,6 +136,8 @@ private struct RootView: View {
             WelcomeView()
         } else if router.needsUsernameSetup {
             UsernameSetupView()
+        } else if router.needsOnboarding {
+            OnboardingChoiceView()
         } else {
             MainTabView()
         }

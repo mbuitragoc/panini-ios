@@ -95,6 +95,7 @@ struct UsernameSetupView: View {
                     body: UpsertUserRequest(username: displayName, handle: handleFormatted)
                 )
                 router.needsUsernameSetup = false
+                router.needsOnboarding = true
             } catch {
                 errorMessage = error.localizedDescription
             }

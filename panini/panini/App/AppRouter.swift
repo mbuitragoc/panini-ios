@@ -39,6 +39,7 @@ enum AppTab: Hashable {
 final class AppRouter {
     var isAuthenticated: Bool = false
     var needsUsernameSetup: Bool = false
+    var needsOnboarding: Bool = false
     var selectedTab: AppTab = .home
 }
 
