@@ -31,6 +31,7 @@ struct paniniApp: App {
     private let apiClient: APIClient
     private let syncEngine: SyncEngine
     private let authService: AuthService
+    private let stickerStore: StickerStore
 
     init() {
         let apiClient = APIClient()
@@ -38,6 +39,7 @@ struct paniniApp: App {
         self.router = AppRouter()
         self.syncEngine = SyncEngine()
         self.authService = AuthService(apiClient: apiClient)
+        self.stickerStore = StickerStore()
     }
 
     var body: some Scene {
@@ -46,7 +48,8 @@ struct paniniApp: App {
                 router: router,
                 apiClient: apiClient,
                 syncEngine: syncEngine,
-                authService: authService
+                authService: authService,
+                stickerStore: stickerStore
             )
         }
     }
@@ -60,6 +63,7 @@ private struct AppContent: View {
     let apiClient: APIClient
     let syncEngine: SyncEngine
     let authService: AuthService
+    let stickerStore: StickerStore
 
     @State private var containerResult: Result<ModelContainer, Error>?
 
@@ -75,8 +79,10 @@ private struct AppContent: View {
                     .environment(apiClient)
                     .environment(syncEngine)
                     .environment(authService)
+                    .environment(stickerStore)
                     .modelContainer(container)
                     .task { await restoreSession() }
+                    .task { stickerStore.seedIfNeeded(context: container.mainContext) }
             case .failure(let error):
                 ModelContainerErrorView(error: error)
             }
