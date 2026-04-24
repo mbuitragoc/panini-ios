@@ -33,6 +33,7 @@ struct paniniApp: App {
     private let authService: AuthService
     private let stickerStore: StickerStore
     private let friendService: FriendService
+    private let tradeService: TradeService
 
     init() {
         let apiClient = APIClient()
@@ -42,6 +43,7 @@ struct paniniApp: App {
         self.authService = AuthService(apiClient: apiClient)
         self.stickerStore = StickerStore()
         self.friendService = FriendService(apiClient: apiClient)
+        self.tradeService = TradeService(apiClient: apiClient)
     }
 
     var body: some Scene {
@@ -52,7 +54,8 @@ struct paniniApp: App {
                 syncEngine: syncEngine,
                 authService: authService,
                 stickerStore: stickerStore,
-                friendService: friendService
+                friendService: friendService,
+                tradeService: tradeService
             )
         }
     }
@@ -68,6 +71,7 @@ private struct AppContent: View {
     let authService: AuthService
     let stickerStore: StickerStore
     let friendService: FriendService
+    let tradeService: TradeService
 
     @Environment(\.scenePhase) private var scenePhase
     @State private var containerResult: Result<ModelContainer, Error>?
@@ -86,6 +90,7 @@ private struct AppContent: View {
                     .environment(authService)
                     .environment(stickerStore)
                     .environment(friendService)
+                    .environment(tradeService)
                     .modelContainer(container)
                     .task { await restoreSession() }
                     .task { stickerStore.seedIfNeeded(context: container.mainContext) }
