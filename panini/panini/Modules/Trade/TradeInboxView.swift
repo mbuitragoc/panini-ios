@@ -128,13 +128,14 @@ struct TradeInboxView: View {
 
     // MARK: - Empty state
 
+    @ViewBuilder
     private func emptyState(for tab: InboxTab) -> some View {
         let (icon, text): (String, String) = switch tab {
         case .received: ("tray", "No incoming trade requests")
         case .sent:     ("paperplane", "No active trade proposals")
         case .history:  ("clock", "No completed or declined trades yet")
         }
-        return VStack(spacing: 12) {
+        VStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 36))
                 .foregroundStyle(theme.inkMuted)
@@ -342,7 +343,7 @@ private struct TradeRow: View {
                                 friendHandle: "takashi_wc26",
                                 friendOwnedCount: 312, status: "accepted")
     container.mainContext.insert(friendship)
-    try? container.mainContext.save()
+    try! container.mainContext.save()
 
     let authService = AuthService(apiClient: APIClient())
     return NavigationStack {

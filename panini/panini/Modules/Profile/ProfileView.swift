@@ -458,11 +458,16 @@ private struct PlaceholderSettingView: View {
     let s1 = Sticker(id: "ARG-10", countryCode: "ARG", stickerNumber: 10,
                      type: "player", playerName: "L. Messi", position: "FWD", nationalTeam: "Argentina")
     let uc1 = UserCollection(userID: "me", stickerID: "ARG-10", quantityOwned: 3)
-    [f1, f2, t1, s1, uc1].forEach { container.mainContext.insert($0) }
+    container.mainContext.insert(f1)
+    container.mainContext.insert(f2)
+    container.mainContext.insert(t1)
+    container.mainContext.insert(s1)
+    container.mainContext.insert(uc1)
     s1.collection = uc1
     try? container.mainContext.save()
 
     return NavigationStack { ProfileView() }
         .modelContainer(container)
         .environment(AuthService(apiClient: APIClient()))
+        .environment(\.router, AppRouter())
 }

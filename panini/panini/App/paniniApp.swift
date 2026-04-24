@@ -150,7 +150,7 @@ private struct AppContent: View {
                 syncEngine.syncAfterWrite(context: container.mainContext)
             }
         case "trades":
-            router.selectedTab = .trade
+            router.selectedTab = .friends
         case "friends":
             router.selectedTab = .friends
         default:

@@ -210,7 +210,11 @@ struct StickerDetailView: View {
             }
 
             NavigationLink {
-                ProposeTradeView()
+                ProposeTradeView(
+                    friendID: "",
+                    offeredStickerIDs: quantity > 1 && !isBlacklisted ? [sticker.id] : [],
+                    requestedStickerIDs: isWishlisted ? [sticker.id] : []
+                )
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.left.arrow.right")
