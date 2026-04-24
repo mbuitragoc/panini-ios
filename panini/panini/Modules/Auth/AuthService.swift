@@ -18,6 +18,12 @@ struct APIUser: Decodable {
     let id: String
     let username: String
     let handle: String
+    let joinedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id, username, handle
+        case joinedAt = "createdAt"
+    }
 }
 
 struct UpsertUserRequest: Encodable {
@@ -46,6 +52,7 @@ enum AuthError: Error, LocalizedError {
 @Observable
 final class AuthService {
     private(set) var currentUserID: String?
+    private(set) var currentUser: APIUser?
 
     private let apiClient: APIClient
 
@@ -89,6 +96,7 @@ final class AuthService {
         do {
             let user: APIUser = try await apiClient.request("/v1/users/me")
             currentUserID = user.id
+            currentUser = user
             return user
         } catch APIError.unauthorized {
             return nil
@@ -100,6 +108,7 @@ final class AuthService {
 
     func signOut() {
         currentUserID = nil
+        currentUser = nil
         apiClient.setAuthToken(nil)
     }
 }

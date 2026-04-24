@@ -27,6 +27,8 @@ private struct ModelContainerErrorView: View {
 
 @main
 struct paniniApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
     private let router: AppRouter
     private let apiClient: APIClient
     private let syncEngine: SyncEngine
@@ -34,6 +36,7 @@ struct paniniApp: App {
     private let stickerStore: StickerStore
     private let friendService: FriendService
     private let tradeService: TradeService
+    private let notificationService: NotificationService
 
     init() {
         let apiClient = APIClient()
@@ -44,6 +47,7 @@ struct paniniApp: App {
         self.stickerStore = StickerStore()
         self.friendService = FriendService(apiClient: apiClient)
         self.tradeService = TradeService(apiClient: apiClient)
+        self.notificationService = NotificationService(apiClient: apiClient)
     }
 
     var body: some Scene {
@@ -55,8 +59,15 @@ struct paniniApp: App {
                 authService: authService,
                 stickerStore: stickerStore,
                 friendService: friendService,
-                tradeService: tradeService
+                tradeService: tradeService,
+                notificationService: notificationService
             )
+            .task {
+                // Wire APNs device token callback to upload handler
+                appDelegate.onDeviceToken = { [notificationService] data in
+                    await notificationService.sendDeviceToken(data)
+                }
+            }
         }
     }
 }
@@ -72,6 +83,7 @@ private struct AppContent: View {
     let stickerStore: StickerStore
     let friendService: FriendService
     let tradeService: TradeService
+    let notificationService: NotificationService
 
     @Environment(\.scenePhase) private var scenePhase
     @State private var containerResult: Result<ModelContainer, Error>?
@@ -91,6 +103,7 @@ private struct AppContent: View {
                     .environment(stickerStore)
                     .environment(friendService)
                     .environment(tradeService)
+                    .environment(notificationService)
                     .modelContainer(container)
                     .task { await restoreSession() }
                     .task { stickerStore.seedIfNeeded(context: container.mainContext) }
@@ -125,17 +138,23 @@ private struct AppContent: View {
         }
     }
 
-    /// Handles `panini://add-friend/<userID>` deep links.
+    /// Handles `panini://` deep links from app URLs and notification taps.
     private func handleDeepLink(_ url: URL, container: ModelContainer) {
-        guard url.scheme == "panini",
-              url.host == "add-friend",
-              let friendID = url.pathComponents.dropFirst().first,
-              !friendID.isEmpty
-        else { return }
+        guard url.scheme == "panini" else { return }
 
-        Task {
-            try? await friendService.sendFriendRequest(friendID: friendID)
-            syncEngine.syncAfterWrite(context: container.mainContext)
+        switch url.host {
+        case "add-friend":
+            guard let friendID = url.pathComponents.dropFirst().first, !friendID.isEmpty else { return }
+            Task {
+                try? await friendService.sendFriendRequest(friendID: friendID)
+                syncEngine.syncAfterWrite(context: container.mainContext)
+            }
+        case "trades":
+            router.selectedTab = .trade
+        case "friends":
+            router.selectedTab = .friends
+        default:
+            break
         }
     }
 
@@ -146,9 +165,11 @@ private struct AppContent: View {
         if let user = await authService.restoreSession() {
             router.isAuthenticated = true
             router.needsUsernameSetup = user.username.isEmpty
+            await notificationService.requestAuthorization()
         } else if apiClient.authToken != nil {
             // Network unavailable but token still present — optimistically enter the app.
             router.isAuthenticated = true
+            await notificationService.requestAuthorization()
         }
     }
 }
