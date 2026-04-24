@@ -41,6 +41,21 @@ final class APIClient {
     init() {
         self.baseURL = ProcessInfo.processInfo.environment["API_BASE_URL"] ?? "http://localhost:9090"
         self.authToken = KeychainService.load(key: KeychainService.jwtKey)
+
+        // Go's time.RFC3339Nano can include fractional seconds; the standard .iso8601
+        // strategy doesn't handle those, so we try both.
+        let iso = ISO8601DateFormatter()
+        let isoFractional = ISO8601DateFormatter()
+        isoFractional.formatOptions.insert(.withFractionalSeconds)
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let str = try decoder.singleValueContainer().decode(String.self)
+            if let d = isoFractional.date(from: str) { return d }
+            if let d = iso.date(from: str) { return d }
+            throw DecodingError.dataCorruptedError(
+                in: try decoder.singleValueContainer(),
+                debugDescription: "Cannot decode date: \(str)"
+            )
+        }
     }
 
     /// Stores a new auth token both in memory and in the Keychain.

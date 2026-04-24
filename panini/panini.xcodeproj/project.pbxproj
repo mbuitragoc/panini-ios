@@ -6,8 +6,19 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXContainerItemProxy section */
+		A1B2C3DC2F9B0CC000427DA8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 152D70E62F9B0CC000427DA8 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 152D70ED2F9B0CC000427DA8;
+			remoteInfo = panini;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		152D70EE2F9B0CC000427DA8 /* panini.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = panini.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1B2C3D82F9B0CC000427DA8 /* paniniTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = paniniTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -16,10 +27,22 @@
 			path = panini;
 			sourceTree = "<group>";
 		};
+		A1B2C3D72F9B0CC000427DA8 /* paniniTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = paniniTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		152D70EB2F9B0CC000427DA8 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1B2C3D62F9B0CC000427DA8 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -33,6 +56,7 @@
 			isa = PBXGroup;
 			children = (
 				152D70F02F9B0CC000427DA8 /* panini */,
+				A1B2C3D72F9B0CC000427DA8 /* paniniTests */,
 				152D70EF2F9B0CC000427DA8 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,6 +65,7 @@
 			isa = PBXGroup;
 			children = (
 				152D70EE2F9B0CC000427DA8 /* panini.app */,
+				A1B2C3D82F9B0CC000427DA8 /* paniniTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -70,6 +95,28 @@
 			productReference = 152D70EE2F9B0CC000427DA8 /* panini.app */;
 			productType = "com.apple.product-type.application";
 		};
+		A1B2C3D42F9B0CC000427DA8 /* paniniTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A1B2C3D92F9B0CC000427DA8 /* Build configuration list for PBXNativeTarget "paniniTests" */;
+			buildPhases = (
+				A1B2C3D52F9B0CC000427DA8 /* Sources */,
+				A1B2C3D62F9B0CC000427DA8 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A1B2C3DD2F9B0CC000427DA8 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A1B2C3D72F9B0CC000427DA8 /* paniniTests */,
+			);
+			name = paniniTests;
+			packageProductDependencies = (
+			);
+			productName = paniniTests;
+			productReference = A1B2C3D82F9B0CC000427DA8 /* paniniTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -82,6 +129,10 @@
 				TargetAttributes = {
 					152D70ED2F9B0CC000427DA8 = {
 						CreatedOnToolsVersion = 26.4.1;
+					};
+					A1B2C3D42F9B0CC000427DA8 = {
+						CreatedOnToolsVersion = 26.4.1;
+						TestTargetID = 152D70ED2F9B0CC000427DA8;
 					};
 				};
 			};
@@ -100,6 +151,7 @@
 			projectRoot = "";
 			targets = (
 				152D70ED2F9B0CC000427DA8 /* panini */,
+				A1B2C3D42F9B0CC000427DA8 /* paniniTests */,
 			);
 		};
 /* End PBXProject section */
@@ -122,7 +174,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A1B2C3D52F9B0CC000427DA8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A1B2C3DD2F9B0CC000427DA8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 152D70ED2F9B0CC000427DA8 /* panini */;
+			targetProxy = A1B2C3DC2F9B0CC000427DA8 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		152D70F92F9B0CC100427DA8 /* Debug */ = {
@@ -312,6 +379,50 @@
 			};
 			name = Release;
 		};
+		A1B2C3DA2F9B0CC000427DA8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Q8578WHHUX;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mbuitragoc.paniniTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/panini.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/panini";
+			};
+			name = Debug;
+		};
+		A1B2C3DB2F9B0CC000427DA8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Q8578WHHUX;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mbuitragoc.paniniTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/panini.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/panini";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -329,6 +440,15 @@
 			buildConfigurations = (
 				152D70FC2F9B0CC100427DA8 /* Debug */,
 				152D70FD2F9B0CC100427DA8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A1B2C3D92F9B0CC000427DA8 /* Build configuration list for PBXNativeTarget "paniniTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1B2C3DA2F9B0CC000427DA8 /* Debug */,
+				A1B2C3DB2F9B0CC000427DA8 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
