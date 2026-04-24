@@ -85,11 +85,14 @@ private struct TeamSpread: View {
                         let cols = Array(repeating: GridItem(.fixed(cardWidth), spacing: spacing), count: 4)
                         LazyVGrid(columns: cols, spacing: spacing) {
                             ForEach(team.stickers, id: \.id) { sticker in
-                                StickerCard(
-                                    sticker: sticker,
-                                    collection: sticker.collection,
-                                    width: cardWidth
-                                )
+                                NavigationLink(value: sticker) {
+                                    StickerCard(
+                                        sticker: sticker,
+                                        collection: sticker.collection,
+                                        width: cardWidth
+                                    )
+                                }
+                                .buttonStyle(.plain)
                             }
                         }
                         .padding(.horizontal, hPad)
@@ -126,5 +129,97 @@ private struct TeamSpread: View {
                 LinearGradient(colors: colors, startPoint: .leading, endPoint: .trailing),
                 in: Capsule()
             )
+    }
+}
+
+// MARK: - TeamAlbumView
+
+/// Single-team album page pushed from HomeView's nations grid tap.
+struct TeamAlbumView: View {
+    let countryCode: String
+
+    @Environment(\.theme) private var theme
+
+    @Query private var stickers: [Sticker]
+
+    init(countryCode: String) {
+        self.countryCode = countryCode
+        _stickers = Query(
+            filter: #Predicate<Sticker> { $0.countryCode == countryCode },
+            sort: [SortDescriptor(\.stickerNumber)]
+        )
+    }
+
+    private var teamName: String { stickers.first?.nationalTeam ?? countryCode }
+    private var ownedCount: Int { stickers.filter { ($0.collection?.quantityOwned ?? 0) > 0 }.count }
+    private var completionPct: Int {
+        stickers.isEmpty ? 0 : (ownedCount * 100) / stickers.count
+    }
+
+    private let hPad: CGFloat = 16
+    private let spacing: CGFloat = 6
+
+    var body: some View {
+        GeometryReader { geo in
+            let cardWidth = (geo.size.width - hPad * 2 - spacing * 3) / 4
+
+            ZStack(alignment: .top) {
+                Rectangle()
+                    .fill(Color(hex: "9A8472").opacity(0.22))
+                    .frame(width: 1.5)
+                    .frame(maxHeight: .infinity)
+                    .allowsHitTesting(false)
+
+                ScrollView {
+                    VStack(spacing: 16) {
+                        teamHeader
+
+                        let cols = Array(repeating: GridItem(.fixed(cardWidth), spacing: spacing), count: 4)
+                        LazyVGrid(columns: cols, spacing: spacing) {
+                            ForEach(stickers, id: \.id) { sticker in
+                                NavigationLink(value: sticker) {
+                                    StickerCard(
+                                        sticker: sticker,
+                                        collection: sticker.collection,
+                                        width: cardWidth
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, hPad)
+                        .padding(.bottom, 32)
+                    }
+                }
+            }
+        }
+        .background(theme.bg)
+        .navigationTitle(teamName)
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(for: Sticker.self) { StickerDetailView(sticker: $0) }
+    }
+
+    private var teamHeader: some View {
+        VStack(spacing: 8) {
+            let colors = teamGradient(for: countryCode)
+            Text(countryCode)
+                .monoStyle(size: 11)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 5)
+                .background(
+                    LinearGradient(colors: colors, startPoint: .leading, endPoint: .trailing),
+                    in: Capsule()
+                )
+            Text(teamName)
+                .displayStyle(size: 20)
+                .foregroundStyle(theme.ink)
+                .multilineTextAlignment(.center)
+            Text("\(completionPct)% complete · \(ownedCount)/\(stickers.count)")
+                .bodyStyle(size: 13)
+                .foregroundStyle(theme.inkMuted)
+        }
+        .padding(.horizontal, 24)
+        .padding(.top, 20)
     }
 }

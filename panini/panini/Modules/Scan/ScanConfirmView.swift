@@ -240,13 +240,15 @@ struct ScanConfirmView: View {
             withAnimation { duplicateAdded = true }
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { dismiss() }
         } else {
-            context.insert(UserCollection(
+            let uc = UserCollection(
                 userID: "",
                 stickerID: s.id,
                 quantityOwned: 1,
                 firstAcquiredAt: .now,
                 updatedAt: .now
-            ))
+            )
+            context.insert(uc)
+            s.collection = uc   // wire relationship so second scan sees it
             try? context.save()
             syncEngine.syncAfterWrite(context: context)
 

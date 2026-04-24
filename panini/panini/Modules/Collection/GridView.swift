@@ -151,11 +151,14 @@ struct GridView: View {
                 ScrollView {
                     LazyVGrid(columns: cols, spacing: spacing) {
                         ForEach(filtered, id: \.id) { sticker in
-                            StickerCard(
-                                sticker: sticker,
-                                collection: sticker.collection,
-                                width: cardWidth
-                            )
+                            NavigationLink(value: sticker) {
+                                StickerCard(
+                                    sticker: sticker,
+                                    collection: sticker.collection,
+                                    width: cardWidth
+                                )
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                     .padding(.horizontal, hPad)

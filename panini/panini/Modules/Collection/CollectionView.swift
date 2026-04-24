@@ -21,6 +21,7 @@ struct CollectionView: View {
         .background(theme.bg)
         .navigationTitle(mode == .album ? "Album" : "Collection")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(for: Sticker.self) { StickerDetailView(sticker: $0) }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Picker("View", selection: $mode) {

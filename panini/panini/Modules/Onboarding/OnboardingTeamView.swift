@@ -71,13 +71,15 @@ struct OnboardingTeamView: View {
                         record.updatedAt = .now
                     }
                 } else {
-                    context.insert(UserCollection(
+                    let uc = UserCollection(
                         userID: "",
                         stickerID: sticker.id,
                         quantityOwned: 1,
                         firstAcquiredAt: .now,
                         updatedAt: .now
-                    ))
+                    )
+                    context.insert(uc)
+                    sticker.collection = uc
                 }
             }
         }
@@ -135,13 +137,15 @@ private struct StickerToggleRow: View {
             record.quantityOwned = isOwned ? 0 : 1
             record.updatedAt = .now
         } else {
-            context.insert(UserCollection(
+            let uc = UserCollection(
                 userID: "",
                 stickerID: sticker.id,
                 quantityOwned: 1,
                 firstAcquiredAt: .now,
                 updatedAt: .now
-            ))
+            )
+            context.insert(uc)
+            sticker.collection = uc
         }
         try? context.save()
     }
