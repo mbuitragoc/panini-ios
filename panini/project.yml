@@ -1,0 +1,53 @@
+name: panini
+
+options:
+  bundleIdPrefix: com.mbuitragoc
+  deploymentTarget:
+    iOS: "26.4"
+  createIntermediateGroups: true
+  groupSortPosition: top
+  generateEmptyDirectories: false
+
+targets:
+  panini:
+    type: application
+    platform: iOS
+    deploymentTarget: "26.4"
+    sources:
+      - path: panini
+        excludes:
+          - paniniApp.swift
+          - ContentView.swift
+          - Item.swift
+    resources:
+      - path: panini/Assets.xcassets
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mbuitragoc.panini
+        DEVELOPMENT_TEAM: Q8578WHHUX
+        SWIFT_VERSION: 5.0
+        IPHONEOS_DEPLOYMENT_TARGET: "26.4"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
+        CURRENT_PROJECT_VERSION: 1
+        MARKETING_VERSION: 1.0
+        SWIFT_EMIT_LOC_STRINGS: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        CODE_SIGN_STYLE: Automatic
+
+  paniniTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "26.4"
+    sources:
+      - path: paniniTests
+    dependencies:
+      - target: panini
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mbuitragoc.paniniTests
+        DEVELOPMENT_TEAM: Q8578WHHUX
+        SWIFT_VERSION: 5.0
