@@ -1,6 +1,15 @@
 import SwiftUI
 import SwiftData
 
+// MARK: - Collection update types
+
+private struct CollectionUpdateRequest: Encodable {
+    var wishlisted: Bool?
+    var blacklisted: Bool?
+}
+
+private struct CollectionUpdateResponse: Decodable {}
+
 // MARK: - StickerDetailView
 
 struct StickerDetailView: View {
@@ -9,9 +18,12 @@ struct StickerDetailView: View {
     @Environment(\.theme) private var theme
     @Environment(\.modelContext) private var context
     @Environment(SyncEngine.self) private var syncEngine
+    @Environment(APIClient.self) private var apiClient
 
     private var isOwned: Bool { (sticker.collection?.quantityOwned ?? 0) > 0 }
     private var quantity: Int { sticker.collection?.quantityOwned ?? 0 }
+    private var isWishlisted: Bool { sticker.collection?.wishlisted == true }
+    private var isBlacklisted: Bool { sticker.collection?.blacklisted == true }
 
     var body: some View {
         ScrollView {
@@ -175,16 +187,26 @@ struct StickerDetailView: View {
     @ViewBuilder
     private var actionButtons: some View {
         VStack(spacing: 12) {
-            Button { markDuplicate() } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "plus.square.on.square")
-                    Text("Mark duplicate")
+            if !isOwned {
+                wishlistButton
+            }
+
+            if isOwned {
+                Button { markDuplicate() } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus.square.on.square")
+                        Text("Mark duplicate")
+                    }
+                    .bodyStyle(size: 16, weight: .semibold)
+                    .foregroundStyle(theme.primaryInk)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(theme.primary, in: RoundedRectangle(cornerRadius: 14))
                 }
-                .bodyStyle(size: 16, weight: .semibold)
-                .foregroundStyle(theme.primaryInk)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(theme.primary, in: RoundedRectangle(cornerRadius: 14))
+            }
+
+            if quantity > 1 {
+                blacklistButton
             }
 
             NavigationLink {
@@ -201,6 +223,48 @@ struct StickerDetailView: View {
                 .background(theme.surface, in: RoundedRectangle(cornerRadius: 14))
                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(theme.chip, lineWidth: 1))
             }
+        }
+    }
+
+    private var wishlistButton: some View {
+        Button { toggleWishlist() } label: {
+            HStack(spacing: 8) {
+                Image(systemName: isWishlisted ? "bookmark.fill" : "bookmark")
+                Text(isWishlisted ? "Remove from wishlist" : "Add to wishlist")
+            }
+            .bodyStyle(size: 16, weight: .semibold)
+            .foregroundStyle(isWishlisted ? theme.primaryInk : theme.ink)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(
+                isWishlisted ? theme.primary : theme.surface,
+                in: RoundedRectangle(cornerRadius: 14)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(theme.chip, lineWidth: isWishlisted ? 0 : 1)
+            )
+        }
+    }
+
+    private var blacklistButton: some View {
+        Button { toggleBlacklist() } label: {
+            HStack(spacing: 8) {
+                Image(systemName: isBlacklisted ? "nosign" : "nosign")
+                Text(isBlacklisted ? "Remove from blacklist" : "Blacklist duplicate")
+            }
+            .bodyStyle(size: 16, weight: .semibold)
+            .foregroundStyle(isBlacklisted ? .white : theme.ink)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(
+                isBlacklisted ? Color(hex: "C0392B") : theme.surface,
+                in: RoundedRectangle(cornerRadius: 14)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(theme.chip, lineWidth: isBlacklisted ? 0 : 1)
+            )
         }
     }
 
@@ -223,5 +287,50 @@ struct StickerDetailView: View {
         }
         try? context.save()
         syncEngine.syncAfterWrite(context: context)
+    }
+
+    // MARK: - Wishlist / Blacklist
+
+    private func toggleWishlist() {
+        let newValue = !isWishlisted
+        if let record = sticker.collection {
+            record.wishlisted = newValue
+            record.updatedAt = .now
+        } else {
+            let uc = UserCollection(
+                userID: "",
+                stickerID: sticker.id,
+                quantityOwned: 0,
+                wishlisted: newValue,
+                updatedAt: .now
+            )
+            context.insert(uc)
+            sticker.collection = uc
+        }
+        try? context.save()
+        Task {
+            let body = CollectionUpdateRequest(wishlisted: newValue)
+            let _: CollectionUpdateResponse? = try? await apiClient.request(
+                "/v1/collections/\(sticker.id)",
+                method: "PUT",
+                body: body
+            )
+        }
+    }
+
+    private func toggleBlacklist() {
+        guard let record = sticker.collection else { return }
+        let newValue = !record.blacklisted
+        record.blacklisted = newValue
+        record.updatedAt = .now
+        try? context.save()
+        Task {
+            let body = CollectionUpdateRequest(blacklisted: newValue)
+            let _: CollectionUpdateResponse? = try? await apiClient.request(
+                "/v1/collections/\(sticker.id)",
+                method: "PUT",
+                body: body
+            )
+        }
     }
 }

@@ -4,11 +4,12 @@ import SwiftData
 // MARK: - StatusFilter
 
 private enum StatusFilter: String, CaseIterable {
-    case all        = "All"
-    case owned      = "Owned"
-    case missing    = "Missing"
-    case duplicates = "Dupes"
-    case wishlisted = "Wishlist"
+    case all         = "All"
+    case owned       = "Owned"
+    case missing     = "Missing"
+    case duplicates  = "Dupes"
+    case wishlisted  = "Wishlist"
+    case blacklisted = "Blacklist"
 }
 
 // MARK: - GridView
@@ -34,11 +35,12 @@ struct GridView: View {
             guard seen.insert(s.id).inserted else { return false }
             let statusOK: Bool = {
                 switch statusFilter {
-                case .all:        return true
-                case .owned:      return (s.collection?.quantityOwned ?? 0) > 0
-                case .missing:    return (s.collection?.quantityOwned ?? 0) == 0
-                case .duplicates: return (s.collection?.quantityOwned ?? 0) > 1
-                case .wishlisted: return s.collection?.wishlisted == true
+                case .all:         return true
+                case .owned:       return (s.collection?.quantityOwned ?? 0) > 0
+                case .missing:     return (s.collection?.quantityOwned ?? 0) == 0
+                case .duplicates:  return (s.collection?.quantityOwned ?? 0) > 1
+                case .wishlisted:  return s.collection?.wishlisted == true
+                case .blacklisted: return s.collection?.blacklisted == true
                 }
             }()
             let posOK = selectedPositions.isEmpty || selectedPositions.contains(s.position ?? "")

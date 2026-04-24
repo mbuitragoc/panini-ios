@@ -130,6 +130,14 @@ struct StickerCard: View {
             if let qty = collection?.quantityOwned, qty > 1, !isMissing {
                 duplicateBadge(qty)
             }
+
+            if collection?.wishlisted == true {
+                wishlistBadge
+            }
+
+            if collection?.blacklisted == true {
+                blacklistBadge
+            }
         }
         .frame(width: width, height: height)
     }
@@ -270,6 +278,46 @@ struct StickerCard: View {
                     .clipShape(Capsule())
                     .padding(.trailing, 5 * scale)
                     .padding(.bottom, 5 * scale)
+            }
+        }
+    }
+
+    // MARK: Wishlist badge
+
+    @ViewBuilder
+    private var wishlistBadge: some View {
+        VStack {
+            Spacer()
+            HStack {
+                Image(systemName: "bookmark.fill")
+                    .font(.system(size: 9 * scale, weight: .bold))
+                    .foregroundStyle(.white)
+                    .padding(4 * scale)
+                    .background(Color(hex: "E67E22"))
+                    .clipShape(Circle())
+                    .padding(.leading, 5 * scale)
+                    .padding(.bottom, 5 * scale)
+                Spacer()
+            }
+        }
+    }
+
+    // MARK: Blacklist badge
+
+    @ViewBuilder
+    private var blacklistBadge: some View {
+        VStack {
+            Spacer()
+            HStack {
+                Image(systemName: "nosign")
+                    .font(.system(size: 9 * scale, weight: .bold))
+                    .foregroundStyle(.white)
+                    .padding(4 * scale)
+                    .background(Color(hex: "C0392B"))
+                    .clipShape(Circle())
+                    .padding(.leading, 5 * scale)
+                    .padding(.bottom, 5 * scale)
+                Spacer()
             }
         }
     }
