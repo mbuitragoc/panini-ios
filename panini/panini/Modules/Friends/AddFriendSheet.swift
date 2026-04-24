@@ -12,17 +12,19 @@ struct AddFriendSheet: View {
     @Environment(FriendService.self) private var friendService
     @Environment(SyncEngine.self) private var syncEngine
 
-    @State private var tab: AddFriendTab = .qr
+    @State private var tab: AddFriendTab = .nearby
     @State private var searchText = ""
     @State private var searchResults: [UserSearchResult] = []
     @State private var isSearching = false
     @State private var sentTo: Set<String> = []
     @State private var searchTask: Task<Void, Never>?
+    @State private var nearbySession = NearbySessionManager()
 
     private enum AddFriendTab: String, CaseIterable {
-        case qr = "QR Code"
-        case airdrop = "AirDrop"
-        case search = "Search"
+        case nearby  = "Nearby"
+        case qr      = "QR Code"
+        case invite  = "Invite"
+        case search  = "Search"
     }
 
     var body: some View {
@@ -39,9 +41,10 @@ struct AddFriendSheet: View {
                 .padding(.bottom, 20)
 
                 switch tab {
-                case .qr:      qrTab
-                case .airdrop: airdropTab
-                case .search:  searchTab
+                case .nearby: nearbyTab
+                case .qr:     qrTab
+                case .invite: inviteTab
+                case .search: searchTab
                 }
 
                 Spacer()
@@ -57,6 +60,139 @@ struct AddFriendSheet: View {
                 }
             }
         }
+        .onAppear { startNearbyIfNeeded() }
+        .onDisappear { nearbySession.stop() }
+        .onChange(of: tab) { _, new in
+            if new == .nearby { startNearbyIfNeeded() }
+        }
+    }
+
+    // MARK: - Nearby tab
+
+    @ViewBuilder
+    private var nearbyTab: some View {
+        switch nearbySession.sessionState {
+        case .unavailable:
+            unavailableState
+
+        case .idle, .searching:
+            searchingState
+
+        case .ranging(let handle, let distance):
+            rangingState(handle: handle, distance: distance)
+
+        case .tapDetected(let handle, _):
+            successState(handle: handle)
+        }
+    }
+
+    private var unavailableState: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "antenna.radiowaves.left.and.right.slash")
+                .font(.system(size: 48))
+                .foregroundStyle(theme.inkMuted)
+            Text("Nearby tap not available")
+                .displayStyle(size: 18)
+                .foregroundStyle(theme.ink)
+            Text("This feature requires an iPhone 11 or later with the U1 chip. Use QR or Search instead.")
+                .bodyStyle(size: 14)
+                .foregroundStyle(theme.inkMuted)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 40)
+    }
+
+    private var searchingState: some View {
+        VStack(spacing: 24) {
+            PulseView(color: theme.primary)
+                .frame(width: 160, height: 160)
+
+            VStack(spacing: 8) {
+                Text("Hold phones close together")
+                    .displayStyle(size: 18)
+                    .foregroundStyle(theme.ink)
+                Text("Both friends need to have this screen open")
+                    .bodyStyle(size: 14)
+                    .foregroundStyle(theme.inkMuted)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.horizontal, 32)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 20)
+    }
+
+    private func rangingState(handle: String, distance: Float) -> some View {
+        let pct = max(0, min(1, (1.0 - Double(distance) / 1.5)))
+        return VStack(spacing: 28) {
+            ZStack {
+                PulseView(color: distance < 0.4 ? .green : theme.primary)
+                    .frame(width: 160, height: 160)
+
+                VStack(spacing: 4) {
+                    Text(String(format: "%.1fm", distance))
+                        .displayStyle(size: 28)
+                        .foregroundStyle(distance < 0.25 ? .green : theme.ink)
+                    Text("away")
+                        .bodyStyle(size: 13)
+                        .foregroundStyle(theme.inkMuted)
+                }
+            }
+
+            VStack(spacing: 10) {
+                Text("@\(handle)")
+                    .bodyStyle(size: 15, weight: .semibold)
+                    .foregroundStyle(theme.ink)
+
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(theme.chip).frame(height: 6)
+                        Capsule().fill(distance < 0.25 ? Color.green : theme.primary)
+                            .frame(width: geo.size.width * pct, height: 6)
+                    }
+                }
+                .frame(height: 6)
+                .padding(.horizontal, 40)
+
+                Text(distance < 0.25 ? "Keep still — connecting…" : "Move closer to connect")
+                    .bodyStyle(size: 13)
+                    .foregroundStyle(theme.inkMuted)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 20)
+        .animation(.easeInOut(duration: 0.3), value: distance)
+    }
+
+    private func successState(handle: String) -> some View {
+        VStack(spacing: 20) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 72))
+                .foregroundStyle(.green)
+                .transition(.scale.combined(with: .opacity))
+
+            VStack(spacing: 6) {
+                Text("Friend request sent!")
+                    .displayStyle(size: 22)
+                    .foregroundStyle(theme.ink)
+                Text("@\(handle)")
+                    .bodyStyle(size: 15)
+                    .foregroundStyle(theme.inkMuted)
+            }
+
+            Button("Done") { dismiss() }
+                .bodyStyle(size: 16, weight: .semibold)
+                .foregroundStyle(theme.primaryInk)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(theme.primary, in: RoundedRectangle(cornerRadius: 14))
+                .padding(.horizontal, 32)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 40)
+        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: true)
     }
 
     // MARK: - QR tab
@@ -65,7 +201,6 @@ struct AddFriendSheet: View {
         VStack(spacing: 20) {
             if let uid = authService.currentUserID {
                 let deepLink = "panini://add-friend/\(uid)"
-
                 if let image = generateQR(from: deepLink) {
                     Image(uiImage: image)
                         .interpolation(.none)
@@ -76,8 +211,7 @@ struct AddFriendSheet: View {
                         .background(Color.white, in: RoundedRectangle(cornerRadius: 16))
                         .shadow(color: .black.opacity(0.08), radius: 12, x: 0, y: 4)
                 }
-
-                Text("Let a friend scan this code to send you a request")
+                Text("Let a friend scan this to send you a request")
                     .bodyStyle(size: 14)
                     .foregroundStyle(theme.inkMuted)
                     .multilineTextAlignment(.center)
@@ -91,30 +225,32 @@ struct AddFriendSheet: View {
         .frame(maxWidth: .infinity)
     }
 
-    // MARK: - AirDrop tab
+    // MARK: - Invite link tab
 
-    private var airdropTab: some View {
+    private var inviteTab: some View {
         VStack(spacing: 20) {
-            Image(systemName: "airplayaudio")
-                .font(.system(size: 60))
+            Image(systemName: "link.badge.plus")
+                .font(.system(size: 56))
                 .foregroundStyle(theme.primary)
 
-            Text("Share your link via AirDrop")
-                .displayStyle(size: 18)
-                .foregroundStyle(theme.ink)
-
-            Text("The recipient will open the link and a friend request will be sent automatically.")
-                .bodyStyle(size: 14)
-                .foregroundStyle(theme.inkMuted)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
+            VStack(spacing: 6) {
+                Text("Share your invite link")
+                    .displayStyle(size: 18)
+                    .foregroundStyle(theme.ink)
+                Text("Anyone who opens your link can send you a friend request.")
+                    .bodyStyle(size: 14)
+                    .foregroundStyle(theme.inkMuted)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.horizontal, 32)
 
             if let uid = authService.currentUserID,
                let url = URL(string: "panini://add-friend/\(uid)") {
-                ShareLink(item: url) {
+                ShareLink(item: url, subject: Text("Add me on Panini!"),
+                          message: Text("Tap this link to add me as a friend on the Panini sticker app.")) {
                     HStack(spacing: 8) {
                         Image(systemName: "square.and.arrow.up")
-                        Text("Share via AirDrop")
+                        Text("Share invite link")
                     }
                     .bodyStyle(size: 16, weight: .semibold)
                     .foregroundStyle(theme.primaryInk)
@@ -141,10 +277,7 @@ struct AddFriendSheet: View {
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
                     .onChange(of: searchText) { _, new in debounceSearch(new) }
-                if isSearching {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                }
+                if isSearching { ProgressView().scaleEffect(0.8) }
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
@@ -160,10 +293,7 @@ struct AddFriendSheet: View {
                 .padding(.top, 40)
             } else {
                 List(searchResults) { user in
-                    SearchResultRow(
-                        user: user,
-                        sent: sentTo.contains(user.id)
-                    ) {
+                    SearchResultRow(user: user, sent: sentTo.contains(user.id)) {
                         sendRequest(to: user)
                     }
                     .listRowBackground(theme.surface)
@@ -177,12 +307,24 @@ struct AddFriendSheet: View {
 
     // MARK: - Helpers
 
+    private func startNearbyIfNeeded() {
+        guard let uid = authService.currentUserID else { return }
+        // Extract handle from auth — fall back to uid prefix
+        let handle = uid // FriendsView has authService.currentUserID; actual handle stored in sync
+        if case .idle = nearbySession.sessionState {
+            nearbySession.onFriendDiscovered = { friendID in
+                Task {
+                    try? await friendService.sendFriendRequest(friendID: friendID)
+                    syncEngine.syncAfterWrite(context: context)
+                }
+            }
+            nearbySession.start(userID: uid, handle: handle)
+        }
+    }
+
     private func debounceSearch(_ query: String) {
         searchTask?.cancel()
-        guard query.count >= 2 else {
-            searchResults = []
-            return
-        }
+        guard query.count >= 2 else { searchResults = []; return }
         searchTask = Task {
             isSearching = true
             try? await Task.sleep(nanoseconds: 350_000_000)
@@ -202,14 +344,44 @@ struct AddFriendSheet: View {
     }
 
     private func generateQR(from string: String) -> UIImage? {
-        let context = CIContext()
+        let ctx = CIContext()
         let filter = CIFilter.qrCodeGenerator()
         filter.message = Data(string.utf8)
         filter.correctionLevel = "M"
         guard let output = filter.outputImage else { return nil }
         let scaled = output.transformed(by: CGAffineTransform(scaleX: 10, y: 10))
-        guard let cgImage = context.createCGImage(scaled, from: scaled.extent) else { return nil }
-        return UIImage(cgImage: cgImage)
+        guard let cg = ctx.createCGImage(scaled, from: scaled.extent) else { return nil }
+        return UIImage(cgImage: cg)
+    }
+}
+
+// MARK: - PulseView
+
+private struct PulseView: View {
+    let color: Color
+    @State private var animate = false
+
+    var body: some View {
+        ZStack {
+            ForEach(0..<3) { i in
+                Circle()
+                    .stroke(color.opacity(animate ? 0 : 0.4), lineWidth: 2)
+                    .scaleEffect(animate ? 1.5 + Double(i) * 0.3 : 1)
+                    .animation(
+                        .easeOut(duration: 1.6)
+                        .repeatForever(autoreverses: false)
+                        .delay(Double(i) * 0.4),
+                        value: animate
+                    )
+            }
+            Circle()
+                .fill(color.opacity(0.15))
+                .frame(width: 80, height: 80)
+            Image(systemName: "person.2.wave.2")
+                .font(.system(size: 32))
+                .foregroundStyle(color)
+        }
+        .onAppear { animate = true }
     }
 }
 
