@@ -11,6 +11,52 @@ import Observation
 final class StickerStore {
     private(set) var isSeeded = false
 
+    /// Merges duplicate UserCollection records that share the same stickerID.
+    /// Caused by a bug where sticker.collection was never wired after insert,
+    /// leaving sticker.collection = nil so every scan created a new record.
+    /// Safe to call every launch — scans once and exits immediately if data is clean.
+    @MainActor
+    func repairDuplicateCollections(context: ModelContext) {
+        guard let all = try? context.fetch(FetchDescriptor<UserCollection>()) else { return }
+
+        let grouped = Dictionary(grouping: all, by: \.stickerID)
+        var dirty = false
+
+        for (stickerID, records) in grouped {
+            // Also delete orphaned records where quantityOwned == 0 with no sticker match.
+            if records.count == 1 {
+                // Re-wire the relationship in case it was never set.
+                let sid = stickerID
+                if let sticker = try? context.fetch(
+                    FetchDescriptor<Sticker>(predicate: #Predicate { $0.id == sid })
+                ).first, sticker.collection == nil {
+                    sticker.collection = records[0]
+                    dirty = true
+                }
+                continue
+            }
+
+            // Multiple records for the same stickerID: merge into one.
+            let sorted = records.sorted { ($0.updatedAt) > ($1.updatedAt) }
+            let keeper = sorted[0]
+            keeper.quantityOwned   = records.reduce(0) { $0 + $1.quantityOwned }
+            keeper.firstAcquiredAt = records.compactMap(\.firstAcquiredAt).min() ?? keeper.firstAcquiredAt
+            keeper.updatedAt       = .now
+
+            for dupe in sorted.dropFirst() { context.delete(dupe) }
+
+            let sid = stickerID
+            if let sticker = try? context.fetch(
+                FetchDescriptor<Sticker>(predicate: #Predicate { $0.id == sid })
+            ).first {
+                sticker.collection = keeper
+            }
+            dirty = true
+        }
+
+        if dirty { try? context.save() }
+    }
+
     /// Seeds SwiftData from the bundled SQLite file if the stickers table is empty.
     /// Safe to call on every launch — exits immediately if data is already present.
     @MainActor

@@ -84,6 +84,7 @@ private struct AppContent: View {
                     .modelContainer(container)
                     .task { await restoreSession() }
                     .task { stickerStore.seedIfNeeded(context: container.mainContext) }
+                    .task { stickerStore.repairDuplicateCollections(context: container.mainContext) }
                     .onChange(of: scenePhase) { _, phase in
                         if phase == .active && router.isAuthenticated {
                             Task { await syncEngine.sync(context: container.mainContext) }
