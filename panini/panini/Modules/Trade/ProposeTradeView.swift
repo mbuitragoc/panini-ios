@@ -10,8 +10,6 @@ private enum PickerMode {
 // MARK: - ProposeTradeView
 
 struct ProposeTradeView: View {
-    let friendID: String
-
     @Environment(\.theme) private var theme
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
@@ -21,15 +19,19 @@ struct ProposeTradeView: View {
     @Query(sort: [SortDescriptor(\Sticker.countryCode), SortDescriptor(\Sticker.stickerNumber)])
     private var allStickers: [Sticker]
 
+    @Query private var friendships: [Friendship]
+
+    @State private var selectedFriendID: String
     @State private var offeredIDs: [String]
     @State private var requestedIDs: [String]
     @State private var pickerMode: PickerMode?
+    @State private var showFriendPicker = false
     @State private var isSending = false
     @State private var showConfirmation = false
     @State private var sendError: String?
 
     init(friendID: String, offeredStickerIDs: [String] = [], requestedStickerIDs: [String] = []) {
-        self.friendID = friendID
+        self._selectedFriendID = State(initialValue: friendID)
         self._offeredIDs = State(initialValue: offeredStickerIDs)
         self._requestedIDs = State(initialValue: requestedStickerIDs)
     }
@@ -54,11 +56,17 @@ struct ProposeTradeView: View {
         }
     }
 
-    private var wishlistStickers: [Sticker] {
-        allStickers.filter {
-            $0.collection?.wishlisted == true
-            && !requestedIDs.contains($0.id)
-        }
+    private var allRequestableStickers: [Sticker] {
+        allStickers.filter { !requestedIDs.contains($0.id) }
+    }
+
+    private var acceptedFriends: [Friendship] {
+        friendships.filter { $0.status == "accepted" }
+    }
+
+    private var selectedFriendName: String? {
+        acceptedFriends.first(where: { $0.friendID == selectedFriendID })
+            .map { $0.friendUsername.isEmpty ? $0.friendHandle : $0.friendUsername }
     }
 
     private var fairnessLabel: String {
@@ -79,7 +87,7 @@ struct ProposeTradeView: View {
     }
 
     private var canSend: Bool {
-        !friendID.isEmpty && !offeredIDs.isEmpty && !requestedIDs.isEmpty && !isSending
+        !selectedFriendID.isEmpty && !offeredIDs.isEmpty && !requestedIDs.isEmpty && !isSending
     }
 
     // MARK: - Body
@@ -87,6 +95,8 @@ struct ProposeTradeView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
+                friendRow
+
                 tradeSection(
                     title: "You're offering",
                     subtitle: "\(offeredStickers.count) sticker\(offeredStickers.count == 1 ? "" : "s")",
@@ -129,7 +139,7 @@ struct ProposeTradeView: View {
         .sheet(item: $pickerMode) { mode in
             StickerPickerSheet(
                 mode: mode,
-                stickers: mode == .offer ? availableDupes : wishlistStickers,
+                stickers: mode == .offer ? availableDupes : allRequestableStickers,
                 onConfirm: { selected in
                     if mode == .offer {
                         offeredIDs.append(contentsOf: selected.filter { !offeredIDs.contains($0) })
@@ -139,11 +149,42 @@ struct ProposeTradeView: View {
                 }
             )
         }
+        .sheet(isPresented: $showFriendPicker) {
+            FriendPickerSheet(friends: acceptedFriends, onSelect: { selectedFriendID = $0 })
+        }
         .alert("Trade proposal sent!", isPresented: $showConfirmation) {
             Button("Done") { dismiss() }
         } message: {
             Text("Your friend will be notified and can accept or decline.")
         }
+    }
+
+    // MARK: - Friend row
+
+    private var friendRow: some View {
+        Button { showFriendPicker = true } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "person.circle")
+                    .font(.system(size: 20))
+                    .foregroundStyle(selectedFriendID.isEmpty ? theme.inkMuted : theme.primary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("To")
+                        .monoStyle(size: 10)
+                        .foregroundStyle(theme.inkMuted)
+                        .tracking(1.2)
+                    Text(selectedFriendName ?? "Select a friend")
+                        .bodyStyle(size: 15, weight: .medium)
+                        .foregroundStyle(selectedFriendID.isEmpty ? theme.inkMuted : theme.ink)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(theme.inkMuted)
+            }
+            .padding(16)
+            .background(theme.surface, in: RoundedRectangle(cornerRadius: 14))
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Trade section
@@ -268,7 +309,7 @@ struct ProposeTradeView: View {
         sendError = nil
         do {
             try await tradeService.createTrade(
-                recipientID: friendID,
+                recipientID: selectedFriendID,
                 offeredStickerIDs: offeredIDs,
                 requestedStickerIDs: requestedIDs
             )
@@ -348,16 +389,82 @@ private struct StickerPickerSheet: View {
             .overlay {
                 if stickers.isEmpty {
                     VStack(spacing: 10) {
-                        Image(systemName: mode == .offer ? "doc.on.doc" : "bookmark")
+                        Image(systemName: mode == .offer ? "doc.on.doc" : "tray")
                             .font(.system(size: 36))
                             .foregroundStyle(theme.inkMuted)
                         Text(mode == .offer
                              ? "No duplicate stickers available to offer"
-                             : "No wishlisted stickers to request")
+                             : "No stickers available to request")
                             .bodyStyle(size: 14)
                             .foregroundStyle(theme.inkMuted)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 32)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - FriendPickerSheet
+
+private struct FriendPickerSheet: View {
+    let friends: [Friendship]
+    let onSelect: (String) -> Void
+
+    @Environment(\.theme) private var theme
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(friends) { f in
+                    Button {
+                        onSelect(f.friendID)
+                        dismiss()
+                    } label: {
+                        HStack(spacing: 12) {
+                            let initial = f.friendHandle.first.map(String.init) ?? "?"
+                            Text(initial.uppercased())
+                                .bodyStyle(size: 15, weight: .semibold)
+                                .foregroundStyle(.white)
+                                .frame(width: 36, height: 36)
+                                .background(Color(hex: "C8511B"), in: Circle())
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(f.friendUsername.isEmpty ? f.friendHandle : f.friendUsername)
+                                    .bodyStyle(size: 15, weight: .medium)
+                                    .foregroundStyle(theme.ink)
+                                Text("@\(f.friendHandle)")
+                                    .bodyStyle(size: 13)
+                                    .foregroundStyle(theme.inkMuted)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    .buttonStyle(.plain)
+                    .listRowBackground(theme.surface)
+                }
+            }
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(theme.bg)
+            .navigationTitle("Choose friend")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+            .overlay {
+                if friends.isEmpty {
+                    VStack(spacing: 10) {
+                        Image(systemName: "person.2")
+                            .font(.system(size: 36))
+                            .foregroundStyle(theme.inkMuted)
+                        Text("No friends to trade with yet")
+                            .bodyStyle(size: 14)
+                            .foregroundStyle(theme.inkMuted)
                     }
                 }
             }

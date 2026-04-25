@@ -15,12 +15,10 @@ struct ScanConfirmView: View {
     @Query(sort: [SortDescriptor(\Sticker.countryCode), SortDescriptor(\Sticker.stickerNumber)])
     private var allStickers: [Sticker]
 
-    // Set when the user picks a player in country-code mode.
     @State private var resolvedID: String? = nil
-    // Drives navigationDestination to the reveal screen.
     @State private var revealSticker: Sticker? = nil
-    // Shown briefly when a duplicate is added, then auto-dismiss fires.
     @State private var duplicateAdded = false
+    @State private var showManualAdd = false
 
     // MARK: - Derived state
 
@@ -215,16 +213,36 @@ struct ScanConfirmView: View {
     // MARK: - Not found
 
     private var notFound: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 24) {
+            Spacer()
             Image(systemName: "questionmark.square.dashed")
-                .font(.system(size: 48))
+                .font(.system(size: 56))
                 .foregroundStyle(theme.inkMuted)
-            Text("\"\(stickerID)\" isn't in the checklist yet.")
-                .bodyStyle(size: 15)
-                .foregroundStyle(theme.inkSoft)
-                .multilineTextAlignment(.center)
+            VStack(spacing: 8) {
+                Text("Sticker not recognised")
+                    .displayStyle(size: 22)
+                    .foregroundStyle(theme.ink)
+                Text("\"\(stickerID)\" isn't in the checklist yet.")
+                    .bodyStyle(size: 14)
+                    .foregroundStyle(theme.inkSoft)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+            }
+            Button {
+                showManualAdd = true
+            } label: {
+                Text("Search manually")
+                    .bodyStyle(size: 15, weight: .semibold)
+                    .foregroundStyle(theme.primaryInk)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(theme.primary, in: RoundedRectangle(cornerRadius: 12))
+            }
+            .padding(.horizontal, 32)
+            Spacer()
         }
-        .padding(.top, 60)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .sheet(isPresented: $showManualAdd) { ManualAddView() }
     }
 
     // MARK: - Save

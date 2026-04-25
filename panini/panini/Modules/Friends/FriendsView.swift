@@ -11,8 +11,15 @@ struct FriendsView: View {
     @Environment(SyncEngine.self) private var syncEngine
 
     @Query(sort: \Friendship.updatedAt, order: .reverse) private var friendships: [Friendship]
+    @Query(sort: \Trade.proposedAt, order: .reverse) private var trades: [Trade]
 
     @State private var showAddFriend = false
+    @State private var showTradeInbox = false
+
+    private var myID: String { authService.currentUserID ?? "" }
+    private var pendingTradeCount: Int {
+        trades.filter { $0.recipientID == myID && $0.status == "proposed" }.count
+    }
 
     private var incoming: [Friendship] {
         friendships.filter { $0.status == "pending" && !$0.sentByMe }
@@ -52,7 +59,25 @@ struct FriendsView: View {
         .navigationTitle("Friends")
         .navigationBarTitleDisplayMode(.large)
         .navigationDestination(for: Friendship.self) { FriendProfileView(friendship: $0) }
+        .navigationDestination(isPresented: $showTradeInbox) { TradeInboxView() }
         .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button { showTradeInbox = true } label: {
+                    Image(systemName: "arrow.left.arrow.right")
+                        .foregroundStyle(theme.primary)
+                }
+                .overlay(alignment: .topTrailing) {
+                    if pendingTradeCount > 0 {
+                        Text("\(pendingTradeCount)")
+                            .bodyStyle(size: 10, weight: .semibold)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 2)
+                            .background(Color.red, in: Capsule())
+                            .offset(x: 10, y: -8)
+                    }
+                }
+            }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button { showAddFriend = true } label: {
                     Image(systemName: "person.badge.plus")

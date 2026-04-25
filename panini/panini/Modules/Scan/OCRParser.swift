@@ -20,10 +20,13 @@ struct OCRParser {
     /// Parses raw recognised text from the back of a sticker.
     ///
     /// Expected pattern: `[COUNTRY_CODE]\s?-?\d+` — e.g. "FRA 20", "FRA20", "fra-20".
-    /// Searches line-by-line so surrounding OCR noise is ignored.
+    /// Iterates every match on every line so "CUP 202" in "FIFA WORLD CUP 2026" is
+    /// skipped when an allowlist of valid codes is provided.
     ///
+    /// - Parameter knownTeams: When non-empty, only matches whose country code is in
+    ///   this set are accepted. Pass the codes from the local sticker database.
     /// Confidence: 0.95 for 3-letter codes, 0.5 for 2-letter codes.
-    static func parseBack(_ text: String) -> OCRParserResult {
+    static func parseBack(_ text: String, knownTeams: Set<String> = []) -> OCRParserResult {
         guard !text.isEmpty else { return OCRParserResult(stickerID: nil, confidence: 0) }
 
         let normalized = text.uppercased()
@@ -35,14 +38,36 @@ struct OCRParser {
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             let nsRange = NSRange(trimmed.startIndex..., in: trimmed)
-            guard let match = pattern.firstMatch(in: trimmed, range: nsRange),
-                  let codeRange   = Range(match.range(at: 1), in: trimmed),
-                  let numberRange = Range(match.range(at: 2), in: trimmed) else { continue }
+            let matches = pattern.matches(in: trimmed, range: nsRange)
 
-            let code   = String(trimmed[codeRange])
-            let number = String(trimmed[numberRange])
-            // 3-letter codes are well-formed Panini codes; 2-letter codes are ambiguous.
-            let confidence: Float = code.count == 3 ? 0.95 : 0.5
+            for match in matches {
+                guard let codeRange   = Range(match.range(at: 1), in: trimmed),
+                      let numberRange = Range(match.range(at: 2), in: trimmed) else { continue }
+
+                let code   = String(trimmed[codeRange])
+                let number = String(trimmed[numberRange])
+
+                // Bypass the allowlist when the match covers the entire line — the item IS
+                // the sticker code (e.g. "ARG 14"), not a false hit inside longer text (e.g.
+                // "CUP 202" inside "FIFA WORLD CUP 2026" where the line has other content).
+                let isFullLine = match.range.length >= trimmed.utf16.count - 1
+                if !isFullLine && !knownTeams.isEmpty && !knownTeams.contains(code) { continue }
+
+                let confidence: Float = code.count == 3 ? 0.95 : 0.5
+                return OCRParserResult(stickerID: "\(code)-\(number)", confidence: confidence)
+            }
+        }
+
+        // Phase 2: full-text search catches codes split across separate OCR items (e.g. "ARG\n14").
+        let fullRange = NSRange(normalized.startIndex..., in: normalized)
+        let fullMatches = pattern.matches(in: normalized, range: fullRange)
+        for match in fullMatches {
+            guard let codeRange   = Range(match.range(at: 1), in: normalized),
+                  let numberRange = Range(match.range(at: 2), in: normalized) else { continue }
+            let code   = String(normalized[codeRange])
+            let number = String(normalized[numberRange])
+            if !knownTeams.isEmpty && !knownTeams.contains(code) { continue }
+            let confidence: Float = code.count == 3 ? 0.85 : 0.4
             return OCRParserResult(stickerID: "\(code)-\(number)", confidence: confidence)
         }
 
@@ -64,11 +89,26 @@ struct OCRParser {
         guard !text.isEmpty else { return OCRParserResult(stickerID: nil, confidence: 0) }
 
         let lowered = text.lowercased()
+        let uppercased = text.uppercased()
         let knownSet = Set(knownTeams)
 
+        // Primary: match full country name (e.g. "france" → "FRA").
         for (name, code) in Self.countryNameToCode {
             guard lowered.contains(name), knownSet.contains(code) else { continue }
             return OCRParserResult(stickerID: code, confidence: 0.75)
+        }
+
+        // Fallback: match country code abbreviation as a whole word in the text.
+        // Stickers sometimes display the code directly (e.g. "ARG", "BRA").
+        let wordPattern = try! NSRegularExpression(pattern: #"\b([A-Z]{3})\b"#)
+        let nsRange = NSRange(uppercased.startIndex..., in: uppercased)
+        let wordMatches = wordPattern.matches(in: uppercased, range: nsRange)
+        for match in wordMatches {
+            guard let r = Range(match.range(at: 1), in: uppercased) else { continue }
+            let code = String(uppercased[r])
+            if knownSet.contains(code) {
+                return OCRParserResult(stickerID: code, confidence: 0.75)
+            }
         }
 
         return OCRParserResult(stickerID: nil, confidence: 0)

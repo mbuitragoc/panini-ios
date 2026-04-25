@@ -5,7 +5,7 @@ import SwiftData
 
 private enum InboxTab: String, CaseIterable {
     case received = "Received"
-    case sent     = "Sent"
+    case active   = "Active"
     case history  = "History"
 }
 
@@ -22,6 +22,7 @@ struct TradeInboxView: View {
     @Query private var friendships: [Friendship]
 
     @State private var selectedTab: InboxTab = .received
+    @State private var selectedTrade: Trade?
 
     private var myID: String { authService.currentUserID ?? "" }
 
@@ -31,22 +32,18 @@ struct TradeInboxView: View {
         trades.filter { $0.recipientID == myID && $0.status == "proposed" }
     }
 
-    private var sent: [Trade] {
-        trades.filter {
-            $0.proposerID == myID
-            && ["proposed", "accepted", "proposer_confirmed"].contains($0.status)
+    /// All in-progress trades where the user is either side, excluding those already in "received".
+    private var active: [Trade] {
+        trades.filter { t in
+            let involved = t.proposerID == myID || t.recipientID == myID
+            let inProgress = ["proposed", "accepted", "proposer_confirmed"].contains(t.status)
+            let notInReceived = !(t.recipientID == myID && t.status == "proposed")
+            return involved && inProgress && notInReceived
         }
     }
 
     private var history: [Trade] {
         trades.filter { ["completed", "declined"].contains($0.status) }
-    }
-
-    private var activeTrades: [Trade] {
-        trades.filter {
-            ($0.proposerID == myID || $0.recipientID == myID)
-            && ["accepted", "proposer_confirmed"].contains($0.status)
-        }
     }
 
     // MARK: - Body
@@ -64,20 +61,15 @@ struct TradeInboxView: View {
                     switch selectedTab {
                     case .received:
                         if received.isEmpty { emptyState(for: .received) }
-                        else { ForEach(received, id: \.id) { TradeRow(trade: $0, myID: myID, friendships: friendships, onAction: handle) } }
+                        else { ForEach(received, id: \.id) { t in TradeRow(trade: t, myID: myID, friendships: friendships, onAction: handle, onTap: { selectedTrade = t }) } }
 
-                    case .sent:
-                        if activeTrades.filter({ $0.proposerID == myID }).isEmpty && sent.filter({ $0.status == "proposed" }).isEmpty {
-                            emptyState(for: .sent)
-                        } else {
-                            let pendingConfirm = activeTrades.filter { $0.proposerID == myID && $0.status == "accepted" }
-                            let inProgress = sent.filter { $0.status == "proposed" }
-                            ForEach(pendingConfirm + inProgress, id: \.id) { TradeRow(trade: $0, myID: myID, friendships: friendships, onAction: handle) }
-                        }
+                    case .active:
+                        if active.isEmpty { emptyState(for: .active) }
+                        else { ForEach(active, id: \.id) { t in TradeRow(trade: t, myID: myID, friendships: friendships, onAction: handle, onTap: { selectedTrade = t }) } }
 
                     case .history:
                         if history.isEmpty { emptyState(for: .history) }
-                        else { ForEach(history, id: \.id) { TradeRow(trade: $0, myID: myID, friendships: friendships, onAction: nil) } }
+                        else { ForEach(history, id: \.id) { t in TradeRow(trade: t, myID: myID, friendships: friendships, onAction: nil, onTap: { selectedTrade = t }) } }
                     }
                 }
                 .padding(.horizontal, 16)
@@ -87,7 +79,19 @@ struct TradeInboxView: View {
         .background(theme.bg)
         .navigationTitle("Trades")
         .navigationBarTitleDisplayMode(.large)
+        .navigationDestination(item: $selectedTrade) { trade in
+            TradeDetailView(trade: trade, myID: myID)
+        }
         .refreshable { await syncEngine.sync(context: context) }
+        .task {
+            // Sync immediately on appear, then every 15 s while the view is on screen.
+            await syncEngine.sync(context: context)
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(15))
+                guard !Task.isCancelled else { break }
+                await syncEngine.sync(context: context)
+            }
+        }
     }
 
     // MARK: - Tab picker
@@ -132,7 +136,7 @@ struct TradeInboxView: View {
     private func emptyState(for tab: InboxTab) -> some View {
         let (icon, text): (String, String) = switch tab {
         case .received: ("tray", "No incoming trade requests")
-        case .sent:     ("paperplane", "No active trade proposals")
+        case .active:   ("paperplane", "No active trades")
         case .history:  ("clock", "No completed or declined trades yet")
         }
         VStack(spacing: 12) {
@@ -178,8 +182,12 @@ private struct TradeRow: View {
     let myID: String
     let friendships: [Friendship]
     let onAction: ((Trade, TradeAction) -> Void)?
+    let onTap: (() -> Void)?
 
     @Environment(\.theme) private var theme
+
+    @Query(sort: [SortDescriptor(\Sticker.countryCode), SortDescriptor(\Sticker.stickerNumber)])
+    private var allStickers: [Sticker]
 
     private var isProposer: Bool { trade.proposerID == myID }
     private var counterpartyID: String { isProposer ? trade.recipientID : trade.proposerID }
@@ -205,17 +213,24 @@ private struct TradeRow: View {
 
     private var statusColor: Color {
         switch status {
-        case .proposed:           return theme.inkMuted
-        case .accepted:           return theme.primary
-        case .proposerConfirmed:  return theme.primary
-        case .declined:           return Color(hex: "E74C3C")
-        case .completed:          return theme.success
-        case .none:               return theme.inkMuted
+        case .proposed:                       return theme.inkMuted
+        case .accepted, .proposerConfirmed:   return theme.primary
+        case .declined:                       return Color(hex: "E74C3C")
+        case .completed:                      return theme.success
+        case .none:                           return theme.inkMuted
         }
     }
 
+    private func stickerThumbnails(for ids: [String], max: Int) -> (matched: [Sticker], extra: Int) {
+        let set = Set(ids)
+        let matched = allStickers.filter { set.contains($0.id) }
+        let shown = Array(matched.prefix(max))
+        return (shown, ids.count - shown.count)
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
+            // Header
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(friendName)
@@ -234,18 +249,23 @@ private struct TradeRow: View {
                     .background(statusColor.opacity(0.12), in: Capsule())
             }
 
-            HStack(spacing: 8) {
-                stickerCountChip(
-                    label: "\(trade.offeredStickers.count) offered",
-                    color: theme.primary
-                )
-                Image(systemName: "arrow.left.arrow.right")
-                    .font(.system(size: 12))
+            // Compact sticker preview
+            stickerPreviewRow
+
+            // Date + detail hint
+            HStack {
+                Text(trade.proposedAt.formatted(date: .abbreviated, time: .omitted))
+                    .monoStyle(size: 11)
                     .foregroundStyle(theme.inkMuted)
-                stickerCountChip(
-                    label: "\(trade.requestedStickers.count) requested",
-                    color: Color(hex: "2196F3")
-                )
+                Spacer()
+                HStack(spacing: 3) {
+                    Text("Details")
+                        .bodyStyle(size: 12)
+                        .foregroundStyle(theme.inkMuted)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(theme.inkMuted)
+                }
             }
 
             if let onAction {
@@ -254,15 +274,45 @@ private struct TradeRow: View {
         }
         .padding(14)
         .background(theme.surface, in: RoundedRectangle(cornerRadius: 14))
+        .contentShape(RoundedRectangle(cornerRadius: 14))
+        .onTapGesture { onTap?() }
     }
 
-    private func stickerCountChip(label: String, color: Color) -> some View {
-        Text(label)
-            .bodyStyle(size: 12)
-            .foregroundStyle(color)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(color.opacity(0.1), in: Capsule())
+    // Inline mini preview: up to 2 thumbnails per side + overflow count
+    private var stickerPreviewRow: some View {
+        let (offeredShown, offeredExtra) = stickerThumbnails(for: trade.offeredStickers, max: 2)
+        let (requestedShown, requestedExtra) = stickerThumbnails(for: trade.requestedStickers, max: 2)
+
+        return HStack(spacing: 6) {
+            ForEach(offeredShown, id: \.id) { s in
+                StickerCard(sticker: s, collection: s.collection, width: 52)
+            }
+            if offeredExtra > 0 {
+                Text("+\(offeredExtra)")
+                    .monoStyle(size: 11)
+                    .foregroundStyle(theme.inkMuted)
+                    .frame(width: 52, height: 68)
+                    .background(theme.chip, in: RoundedRectangle(cornerRadius: 8))
+            }
+
+            Image(systemName: "arrow.left.arrow.right")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(theme.inkMuted)
+                .padding(.horizontal, 4)
+
+            ForEach(requestedShown, id: \.id) { s in
+                StickerCard(sticker: s, collection: s.collection, width: 52)
+            }
+            if requestedExtra > 0 {
+                Text("+\(requestedExtra)")
+                    .monoStyle(size: 11)
+                    .foregroundStyle(theme.inkMuted)
+                    .frame(width: 52, height: 68)
+                    .background(theme.chip, in: RoundedRectangle(cornerRadius: 8))
+            }
+
+            Spacer()
+        }
     }
 
     @ViewBuilder
@@ -289,18 +339,8 @@ private struct TradeRow: View {
             }
             .buttonStyle(.plain)
 
-        case .accepted where isProposer:
-            Button { onAction(trade, .confirm) } label: {
-                Text("Confirm exchange")
-                    .bodyStyle(size: 14, weight: .semibold)
-                    .foregroundStyle(theme.primaryInk)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .background(theme.primary, in: RoundedRectangle(cornerRadius: 10))
-            }
-            .buttonStyle(.plain)
-
-        case .proposerConfirmed where !isProposer:
+        case .accepted where isProposer,
+             .proposerConfirmed where !isProposer:
             Button { onAction(trade, .confirm) } label: {
                 Text("Confirm exchange")
                     .bodyStyle(size: 14, weight: .semibold)

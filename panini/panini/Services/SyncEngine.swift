@@ -21,6 +21,15 @@ private struct CollectionSyncItem: Decodable {
     let updatedAt: Date
 }
 
+private struct PushCollectionBody: Encodable {
+    let quantityOwned: Int
+    let wishlisted: Bool
+    let blacklisted: Bool
+}
+
+// Dummy decodable used when the push response body isn't needed.
+private struct PushAck: Decodable {}
+
 private struct TradeSyncItem: Decodable {
     let id: String
     let proposerId: String
@@ -84,9 +93,38 @@ final class SyncEngine {
         }
     }
 
-    /// Hook for write paths (e.g., adding a sticker) to trigger an immediate sync.
+    /// Pushes any locally-modified collection records to the server, then pulls a delta sync.
     func syncAfterWrite(context: ModelContext) {
-        Task { await sync(context: context) }
+        Task {
+            await pushPendingCollections(context: context)
+            await sync(context: context)
+        }
+    }
+
+    /// Uploads UserCollection records whose updatedAt is newer than the last successful sync.
+    /// Uses the LWW-safe upsert endpoint, so calling this multiple times is harmless.
+    @MainActor
+    private func pushPendingCollections(context: ModelContext) async {
+        let sinceDate = UserDefaults.standard.string(forKey: lastSyncedAtKey)
+            .flatMap { ISO8601DateFormatter().date(from: $0) }
+
+        let all = (try? context.fetch(FetchDescriptor<UserCollection>())) ?? []
+        let pending = sinceDate == nil ? all : all.filter { $0.updatedAt > sinceDate! }
+
+        guard !pending.isEmpty else { return }
+
+        for local in pending {
+            let body = PushCollectionBody(
+                quantityOwned: local.quantityOwned,
+                wishlisted: local.wishlisted,
+                blacklisted: local.blacklisted
+            )
+            _ = try? await apiClient.request(
+                "/v1/collections/\(local.stickerID)",
+                method: "PUT",
+                body: body
+            ) as PushAck
+        }
     }
 
     // MARK: - Diff application
