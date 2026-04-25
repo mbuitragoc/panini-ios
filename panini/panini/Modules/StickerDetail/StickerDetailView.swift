@@ -85,12 +85,117 @@ struct StickerDetailView: View {
             .frame(maxWidth: .infinity)
             .padding(.top, 60)   // space for card bleed
 
+            if sticker.type == "player" {
+                if let rating = sticker.rating {
+                    ovrStrip(rating: rating)
+                    playerStatsCard(rating: rating)
+                }
+            }
+
             ownershipStrip
             metadataTable
             actionButtons
         }
         .padding(.horizontal, 20)
         .padding(.bottom, 40)
+    }
+
+    // MARK: - OVR strip
+
+    private func ovrStrip(rating: PlayerRating) -> some View {
+        HStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(rating.overall)")
+                    .font(.system(size: 48, weight: .black, design: .monospaced))
+                    .foregroundStyle(rating.rarityColor)
+                Text("OVR")
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(theme.inkMuted)
+            }
+            Spacer()
+            rarityBadge(rating: rating)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
+        .background(theme.surface, in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    private func rarityBadge(rating: PlayerRating) -> some View {
+        Text(rating.rarity.uppercased())
+            .font(.system(size: 11, weight: .black, design: .monospaced))
+            .foregroundStyle(rating.rarityColor)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(rating.rarityColor.opacity(0.4), lineWidth: 1.5)
+            )
+    }
+
+    // MARK: - Player stats card
+
+    private func playerStatsCard(rating: PlayerRating) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Field + radar side by side when nation position is available
+            if let pos = rating.nationPosition, !pos.isEmpty {
+                HStack(alignment: .top, spacing: 12) {
+                    fieldPositionCard(rating: rating, position: pos)
+                    radarCard(rating: rating)
+                }
+            } else {
+                radarCard(rating: rating)
+                    .frame(maxWidth: .infinity)
+            }
+
+            // Play styles
+            if !rating.playStyles.isEmpty {
+                playStylesRow(styles: rating.playStyles)
+            }
+        }
+        .padding(16)
+        .background(theme.surface, in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    private func fieldPositionCard(rating: PlayerRating, position: String) -> some View {
+        VStack(spacing: 8) {
+            FieldPositionView(
+                position: position,
+                jerseyNumber: rating.nationJerseyNumber,
+                accentColor: rating.rarityColor
+            )
+            .frame(width: 110, height: 155)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+
+            Text(position)
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundStyle(theme.inkMuted)
+        }
+    }
+
+    private func radarCard(rating: PlayerRating) -> some View {
+        RadarChartView(
+            stats: rating.radarStats,
+            accentColor: rating.rarityColor,
+            chartSize: 200
+        )
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .background(Color.black.opacity(0.15), in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func playStylesRow(styles: [String]) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(styles, id: \.self) { style in
+                    Text(style)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(theme.ink)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(theme.chip, in: Capsule())
+                }
+            }
+        }
     }
 
     // MARK: - Ownership strip

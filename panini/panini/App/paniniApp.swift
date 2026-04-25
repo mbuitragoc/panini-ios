@@ -107,6 +107,7 @@ private struct AppContent: View {
                     .modelContainer(container)
                     .task { await restoreSession() }
                     .task { stickerStore.seedIfNeeded(context: container.mainContext) }
+                    .task { stickerStore.seedRatingsIfNeeded(context: container.mainContext) } // no-op on first install; catches update case
                     .task { stickerStore.repairDuplicateCollections(context: container.mainContext) }
                     .onChange(of: scenePhase) { _, phase in
                         if phase == .active && router.isAuthenticated {
@@ -127,6 +128,7 @@ private struct AppContent: View {
             let schema = Schema([
                 Sticker.self,
                 UserCollection.self,
+                PlayerRating.self,
                 Friendship.self,
                 Trade.self
             ])

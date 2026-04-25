@@ -19,6 +19,7 @@ final class Sticker {
     var rarity: String
 
     @Relationship(deleteRule: .cascade) var collection: UserCollection?
+    @Relationship(deleteRule: .nullify, inverse: \PlayerRating.sticker) var rating: PlayerRating?
 
     init(
         id: String,

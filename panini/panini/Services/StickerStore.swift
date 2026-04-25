@@ -84,6 +84,54 @@ final class StickerStore {
         }
         try? context.save()
         isSeeded = true
+
+        // Seed ratings immediately after stickers are committed.
+        seedRatingsIfNeeded(context: context)
+    }
+
+    /// Seeds PlayerRating records from the bundled SQLite if none exist yet.
+    /// Also called from seedIfNeeded (after stickers) and from the app launch task
+    /// to handle the case where the app was updated and stickers already exist.
+    @MainActor
+    func seedRatingsIfNeeded(context: ModelContext) {
+        let existingStickers = (try? context.fetchCount(FetchDescriptor<Sticker>())) ?? 0
+        let existingRatings = (try? context.fetchCount(FetchDescriptor<PlayerRating>())) ?? 0
+        guard existingStickers > 0, existingRatings == 0 else { return }
+
+        guard let ratingRows = readBundledRatings() else { return }
+
+        for row in ratingRows {
+            let sid = row.stickerID
+            guard let sticker = try? context.fetch(
+                FetchDescriptor<Sticker>(predicate: #Predicate { $0.id == sid })
+            ).first else { continue }
+
+            let rating = PlayerRating(
+                stickerID: row.stickerID,
+                overall: row.overall,
+                pace: row.pace,
+                shooting: row.shooting,
+                passing: row.passing,
+                dribbling: row.dribbling,
+                defending: row.defending,
+                physical: row.physical,
+                gkDiving: row.gkDiving,
+                gkHandling: row.gkHandling,
+                gkKicking: row.gkKicking,
+                gkReflexes: row.gkReflexes,
+                gkSpeed: row.gkSpeed,
+                gkPositioning: row.gkPositioning,
+                nationPosition: row.nationPosition,
+                nationJerseyNumber: row.nationJerseyNumber,
+                playStyles: row.playStyles,
+                rarity: row.rarity,
+                confidence: row.confidence
+            )
+            context.insert(rating)
+            rating.sticker = sticker
+            sticker.rating = rating
+        }
+        try? context.save()
     }
 
     // MARK: - Private
@@ -92,6 +140,16 @@ final class StickerStore {
         let id, countryCode, type, nationalTeam: String
         let stickerNumber: Int
         let playerName, position, club, clubCountry: String?
+    }
+
+    private struct RatingRow {
+        let stickerID: String
+        let overall, pace, shooting, passing, dribbling, defending, physical: Int
+        let gkDiving, gkHandling, gkKicking, gkReflexes, gkSpeed, gkPositioning: Int
+        let nationPosition: String?
+        let nationJerseyNumber: Int?
+        let playStyles: [String]
+        let rarity, confidence: String
     }
 
     private func readBundledSQLite() -> [Row]? {
@@ -128,6 +186,64 @@ final class StickerStore {
                 position:      col(stmt, 5),
                 club:          col(stmt, 7),
                 clubCountry:   col(stmt, 8)
+            ))
+        }
+        return rows
+    }
+
+    private func readBundledRatings() -> [RatingRow]? {
+        guard let url = Bundle.main.url(forResource: "stickers", withExtension: "sqlite") else {
+            return nil
+        }
+        var db: OpaquePointer?
+        guard sqlite3_open_v2(url.path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else {
+            sqlite3_close(db); return nil
+        }
+        defer { sqlite3_close(db) }
+
+        let sql = """
+            SELECT spl.sticker_id,
+                   pr.overall, pr.pace, pr.shooting, pr.passing,
+                   pr.dribbling, pr.defending, pr.physical,
+                   pr.gk_diving, pr.gk_handling, pr.gk_kicking,
+                   pr.gk_reflexes, pr.gk_speed, pr.gk_positioning,
+                   pr.nation_position, pr.nation_jersey_number,
+                   pr.play_styles, pr.rarity, spl.confidence
+            FROM sticker_player_link spl
+            JOIN player_ratings pr ON pr.id = spl.player_rating_id
+            WHERE spl.player_rating_id IS NOT NULL
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return nil }
+        defer { sqlite3_finalize(stmt) }
+
+        var rows: [RatingRow] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            let jerseyRaw = Int(sqlite3_column_int(stmt, 15))
+            let playStylesJSON = col(stmt, 16) ?? "[]"
+            let playStyles = (try? JSONDecoder().decode([String].self,
+                from: Data(playStylesJSON.utf8))) ?? []
+
+            rows.append(RatingRow(
+                stickerID:       col(stmt, 0) ?? "",
+                overall:         Int(sqlite3_column_int(stmt, 1)),
+                pace:            Int(sqlite3_column_int(stmt, 2)),
+                shooting:        Int(sqlite3_column_int(stmt, 3)),
+                passing:         Int(sqlite3_column_int(stmt, 4)),
+                dribbling:       Int(sqlite3_column_int(stmt, 5)),
+                defending:       Int(sqlite3_column_int(stmt, 6)),
+                physical:        Int(sqlite3_column_int(stmt, 7)),
+                gkDiving:        Int(sqlite3_column_int(stmt, 8)),
+                gkHandling:      Int(sqlite3_column_int(stmt, 9)),
+                gkKicking:       Int(sqlite3_column_int(stmt, 10)),
+                gkReflexes:      Int(sqlite3_column_int(stmt, 11)),
+                gkSpeed:         Int(sqlite3_column_int(stmt, 12)),
+                gkPositioning:   Int(sqlite3_column_int(stmt, 13)),
+                nationPosition:  col(stmt, 14),
+                nationJerseyNumber: jerseyRaw == 0 ? nil : jerseyRaw,
+                playStyles:      playStyles,
+                rarity:          col(stmt, 17) ?? "bronze",
+                confidence:      col(stmt, 18) ?? "unmatched"
             ))
         }
         return rows
