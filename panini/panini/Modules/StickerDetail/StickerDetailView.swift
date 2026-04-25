@@ -29,6 +29,8 @@ struct StickerDetailView: View {
     private var isWishlisted: Bool { sticker.collection?.wishlisted == true }
     private var isBlacklisted: Bool { sticker.collection?.blacklisted == true }
 
+    @State private var holoOffset: CGFloat = -1
+
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
@@ -62,10 +64,29 @@ struct StickerDetailView: View {
                 }
 
             // Tilted sticker card
-            StickerCard(sticker: sticker, collection: sticker.collection, width: 190)
-                .rotationEffect(.degrees(-5))
-                .shadow(color: .black.opacity(0.30), radius: 18, x: 0, y: 10)
-                .offset(y: 50)
+            let isHolo = ["gold", "legendary"].contains(sticker.rating?.rarity ?? "")
+            ZStack {
+                StickerCard(sticker: sticker, collection: sticker.collection, width: 190)
+                if isHolo {
+                    LinearGradient(
+                        colors: [.clear, .white.opacity(0.35), .clear],
+                        startPoint: UnitPoint(x: holoOffset, y: 0),
+                        endPoint: UnitPoint(x: holoOffset + 0.6, y: 1)
+                    )
+                    .blendMode(.screen)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+            }
+            .rotationEffect(.degrees(-5))
+            .shadow(color: .black.opacity(0.30), radius: 18, x: 0, y: 10)
+            .offset(y: 50)
+            .onAppear {
+                if isHolo {
+                    withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+                        holoOffset = 1
+                    }
+                }
+            }
         }
         .frame(maxWidth: .infinity)
         .clipped()
@@ -94,6 +115,8 @@ struct StickerDetailView: View {
                 if let rating = sticker.rating {
                     ovrStrip(rating: rating)
                     playerStatsCard(rating: rating)
+                } else {
+                    ratingUnavailableRow
                 }
             }
 
@@ -135,6 +158,21 @@ struct StickerDetailView: View {
                 RoundedRectangle(cornerRadius: 8)
                     .stroke(rating.rarityColor.opacity(0.4), lineWidth: 1.5)
             )
+    }
+
+    private var ratingUnavailableRow: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "questionmark.circle")
+                .font(.system(size: 16))
+                .foregroundStyle(theme.inkMuted)
+            Text("Rating unavailable")
+                .bodyStyle(size: 14)
+                .foregroundStyle(theme.inkMuted)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
+        .padding(.horizontal, 20)
+        .background(theme.surface, in: RoundedRectangle(cornerRadius: 14))
     }
 
     // MARK: - Player stats card
@@ -315,6 +353,24 @@ struct StickerDetailView: View {
                 }
             }
 
+            if quantity > 0 {
+                Button { removeOne() } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "minus.circle")
+                        Text("Remove one from collection")
+                    }
+                    .bodyStyle(size: 16, weight: .semibold)
+                    .foregroundStyle(theme.inkSoft)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(theme.surface, in: RoundedRectangle(cornerRadius: 14))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(Color(hex: "C0392B").opacity(0.35), lineWidth: 1)
+                    )
+                }
+            }
+
             if quantity > 1 {
                 blacklistButton
             }
@@ -403,6 +459,14 @@ struct StickerDetailView: View {
         syncEngine.syncAfterWrite(context: context)
     }
 
+    private func removeOne() {
+        guard let record = sticker.collection, record.quantityOwned > 0 else { return }
+        record.quantityOwned -= 1
+        record.updatedAt = .now
+        try? context.save()
+        syncEngine.syncAfterWrite(context: context)
+    }
+
     // MARK: - Wishlist / Blacklist
 
     private func toggleWishlist() {
@@ -451,7 +515,8 @@ struct StickerDetailView: View {
     // MARK: - Missing rating report
 
     private func reportMissingRatingIfNeeded() {
-        guard sticker.type == "player", sticker.rating == nil else { return }
+        guard sticker.type == "player",
+              sticker.rating == nil || sticker.rating?.confidence == "unmatched" else { return }
         Task {
             let body = MissingRatingsRequest(sticker_ids: [sticker.id])
             let _: CollectionUpdateResponse? = try? await apiClient.request(
