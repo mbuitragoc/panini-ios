@@ -4,6 +4,7 @@ struct UsernameSetupView: View {
     @Environment(\.theme) private var theme
     @Environment(\.router) private var router
     @Environment(APIClient.self) private var apiClient
+    @Environment(AuthService.self) private var authService
 
     @State private var displayName = ""
     @State private var handle = ""
@@ -96,6 +97,12 @@ struct UsernameSetupView: View {
                 )
                 router.needsUsernameSetup = false
                 router.needsOnboarding = true
+            } catch APIError.notFound {
+                // JWT references a user that no longer exists — sign out and restart
+                authService.signOut()
+                router.isAuthenticated = false
+            } catch APIError.conflict(let msg) {
+                errorMessage = msg
             } catch {
                 errorMessage = error.localizedDescription
             }

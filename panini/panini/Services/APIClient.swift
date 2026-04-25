@@ -6,6 +6,8 @@ import Observation
 enum APIError: Error, LocalizedError {
     case invalidURL(String)
     case unauthorized
+    case notFound
+    case conflict(String)
     case httpError(statusCode: Int)
     case decodingFailed(underlying: Error)
 
@@ -15,6 +17,10 @@ enum APIError: Error, LocalizedError {
             return "Invalid URL: \(url)"
         case .unauthorized:
             return "Your session has expired. Please sign in again."
+        case .notFound:
+            return "Not found."
+        case .conflict(let msg):
+            return msg
         case .httpError(let code):
             return "Server error (\(code)). Please try again."
         case .decodingFailed(let error):
@@ -108,7 +114,12 @@ final class APIClient {
         }
 
         guard (200..<300).contains(httpResponse.statusCode) else {
-            throw APIError.httpError(statusCode: httpResponse.statusCode)
+            let serverMessage = (try? decoder.decode([String: String].self, from: data))?["error"]
+            switch httpResponse.statusCode {
+            case 404: throw APIError.notFound
+            case 409: throw APIError.conflict(serverMessage ?? "Already taken — try a different username or handle.")
+            default:  throw APIError.httpError(statusCode: httpResponse.statusCode)
+            }
         }
 
         do {
