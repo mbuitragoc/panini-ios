@@ -111,17 +111,20 @@ struct RadarChartView: View {
     }
 }
 
-// MARK: - Rarity color
+// MARK: - Rarity helpers
 
 extension PlayerRating {
+    /// Primary display color for the tier.
     var rarityColor: Color {
         switch rarity {
-        case "legendary": return Color(hex: "FFD700")
-        case "gold":      return Color(hex: "E0A020")
-        case "silver":    return Color(hex: "B8B8B8")
-        default:          return Color(hex: "CD7F32")
+        case "legendary": return Color(hex: "9B59B6")   // amethyst purple
+        case "gold":      return Color(hex: "F5A623")   // warm amber
+        case "silver":    return Color(hex: "A8B8C8")   // steel blue-grey
+        default:          return Color(hex: "CD7F32")   // copper bronze
         }
     }
+
+    var isLegendary: Bool { rarity == "legendary" }
 
     var outfieldStats: [RadarChartView.Stat] {
         [

@@ -64,25 +64,39 @@ struct StickerDetailView: View {
                 }
 
             // Tilted sticker card
-            let isHolo = ["gold", "legendary"].contains(sticker.rating?.rarity ?? "")
+            let isHolo      = ["gold", "legendary"].contains(sticker.rating?.rarity ?? "")
+            let isLegendary = sticker.rating?.rarity == "legendary"
             ZStack {
+                // Halo sits behind the card
+                if isLegendary {
+                    CardAura(cardWidth: 190)
+                }
                 StickerCard(sticker: sticker, collection: sticker.collection, width: 190)
+                // Iridescent sheen over the card
                 if isHolo {
                     LinearGradient(
-                        colors: [.clear, .white.opacity(0.35), .clear],
+                        colors: isLegendary
+                            ? [.clear, Color(hex: "9B59B6").opacity(0.5),
+                               Color(hex: "4A90D9").opacity(0.45), .clear]
+                            : [.clear, .white.opacity(0.35), .clear],
                         startPoint: UnitPoint(x: holoOffset, y: 0),
-                        endPoint: UnitPoint(x: holoOffset + 0.6, y: 1)
+                        endPoint: UnitPoint(x: holoOffset + (isLegendary ? 0.8 : 0.6), y: 1)
                     )
                     .blendMode(.screen)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
             }
             .rotationEffect(.degrees(-5))
-            .shadow(color: .black.opacity(0.30), radius: 18, x: 0, y: 10)
+            .shadow(
+                color: isLegendary ? Color(hex: "9B59B6").opacity(0.55) : .black.opacity(0.30),
+                radius: isLegendary ? 24 : 18,
+                x: 0, y: isLegendary ? 6 : 10
+            )
             .offset(y: 50)
             .onAppear {
                 if isHolo {
-                    withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+                    withAnimation(.easeInOut(duration: isLegendary ? 1.5 : 2)
+                                    .repeatForever(autoreverses: true)) {
                         holoOffset = 1
                     }
                 }
@@ -141,23 +155,11 @@ struct StickerDetailView: View {
                     .foregroundStyle(theme.inkMuted)
             }
             Spacer()
-            rarityBadge(rating: rating)
+            RarityBadge(rating: rating)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
         .background(theme.surface, in: RoundedRectangle(cornerRadius: 14))
-    }
-
-    private func rarityBadge(rating: PlayerRating) -> some View {
-        Text(rating.rarity.uppercased())
-            .font(.system(size: 11, weight: .black, design: .monospaced))
-            .foregroundStyle(rating.rarityColor)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(rating.rarityColor.opacity(0.4), lineWidth: 1.5)
-            )
     }
 
     private var ratingUnavailableRow: some View {

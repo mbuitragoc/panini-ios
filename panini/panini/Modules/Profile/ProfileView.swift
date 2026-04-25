@@ -250,7 +250,7 @@ struct ProfileView: View {
             VStack(spacing: 0) {
                 settingsRow(icon: "bell",                          label: "Notifications",    title: "Notifications")
                 Divider().padding(.leading, 52)
-                settingsRow(icon: "camera",                        label: "Scan preferences", title: "Scan preferences")
+                scanPreferencesRow
                 Divider().padding(.leading, 52)
                 settingsRow(icon: "lock",                          label: "Privacy",          title: "Privacy")
                 Divider().padding(.leading, 52)
@@ -265,23 +265,34 @@ struct ProfileView: View {
 
     private func settingsRow(icon: String, label: String, title: String) -> some View {
         NavigationLink(destination: PlaceholderSettingView(title: title)) {
-            HStack(spacing: 14) {
-                Image(systemName: icon)
-                    .font(.system(size: 16))
-                    .foregroundStyle(theme.primary)
-                    .frame(width: 24)
-                Text(label)
-                    .bodyStyle(size: 15)
-                    .foregroundStyle(theme.ink)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(theme.inkMuted)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
+            settingsRowLabel(icon: icon, label: label)
         }
         .buttonStyle(.plain)
+    }
+
+    private var scanPreferencesRow: some View {
+        NavigationLink(destination: ScanPreferencesView()) {
+            settingsRowLabel(icon: "camera", label: "Scan preferences")
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func settingsRowLabel(icon: String, label: String) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundStyle(theme.primary)
+                .frame(width: 24)
+            Text(label)
+                .bodyStyle(size: 15)
+                .foregroundStyle(theme.ink)
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(theme.inkMuted)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
     }
 
     private var signOutRow: some View {
@@ -437,6 +448,33 @@ private struct PlaceholderSettingView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(theme.bg)
         .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+// MARK: - ScanPreferencesView
+
+private struct ScanPreferencesView: View {
+    @AppStorage("revealsEnabled") private var revealsEnabled: Bool = true
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        List {
+            Section {
+                Toggle(isOn: $revealsEnabled) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Reveal animation")
+                            .bodyStyle(size: 15)
+                            .foregroundStyle(theme.ink)
+                        Text("Play a cinematic animation when adding a new sticker")
+                            .bodyStyle(size: 12)
+                            .foregroundStyle(theme.inkMuted)
+                    }
+                }
+                .tint(theme.primary)
+            }
+        }
+        .navigationTitle("Scan preferences")
         .navigationBarTitleDisplayMode(.inline)
     }
 }

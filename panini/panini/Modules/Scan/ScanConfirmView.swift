@@ -12,6 +12,8 @@ struct ScanConfirmView: View {
     @Environment(\.theme) private var theme
     @Environment(SyncEngine.self) private var syncEngine
 
+    @AppStorage("revealsEnabled") private var revealsEnabled: Bool = true
+
     @Query(sort: [SortDescriptor(\Sticker.countryCode), SortDescriptor(\Sticker.stickerNumber)])
     private var allStickers: [Sticker]
 
@@ -65,8 +67,11 @@ struct ScanConfirmView: View {
                 }
             }
             .navigationDestination(item: $revealSticker) { s in
-                StickerRevealView(sticker: s)
-                    .navigationBarBackButtonHidden()
+                StickerRevealView(sticker: s, onConfirm: {
+                    actualSave(s)
+                    dismiss()
+                })
+                .navigationBarBackButtonHidden()
             }
         }
     }
@@ -254,24 +259,29 @@ struct ScanConfirmView: View {
             try? context.save()
             syncEngine.syncAfterWrite(context: context)
 
-            // Duplicate path: brief feedback, then auto-dismiss.
             withAnimation { duplicateAdded = true }
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { dismiss() }
         } else {
-            let uc = UserCollection(
-                userID: "",
-                stickerID: s.id,
-                quantityOwned: 1,
-                firstAcquiredAt: .now,
-                updatedAt: .now
-            )
-            context.insert(uc)
-            s.collection = uc   // wire relationship so second scan sees it
-            try? context.save()
-            syncEngine.syncAfterWrite(context: context)
-
-            // New sticker path: navigate to reveal.
-            revealSticker = s
+            if revealsEnabled {
+                revealSticker = s
+            } else {
+                actualSave(s)
+                dismiss()
+            }
         }
+    }
+
+    private func actualSave(_ s: Sticker) {
+        let uc = UserCollection(
+            userID: "",
+            stickerID: s.id,
+            quantityOwned: 1,
+            firstAcquiredAt: .now,
+            updatedAt: .now
+        )
+        context.insert(uc)
+        s.collection = uc
+        try? context.save()
+        syncEngine.syncAfterWrite(context: context)
     }
 }
