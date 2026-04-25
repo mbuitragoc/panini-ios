@@ -10,6 +10,10 @@ private struct CollectionUpdateRequest: Encodable {
 
 private struct CollectionUpdateResponse: Decodable {}
 
+private struct MissingRatingsRequest: Encodable {
+    var sticker_ids: [String]
+}
+
 // MARK: - StickerDetailView
 
 struct StickerDetailView: View {
@@ -36,6 +40,7 @@ struct StickerDetailView: View {
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .ignoresSafeArea(edges: .top)
+        .task { reportMissingRatingIfNeeded() }
     }
 
     // MARK: - Hero
@@ -438,6 +443,20 @@ struct StickerDetailView: View {
             let _: CollectionUpdateResponse? = try? await apiClient.request(
                 "/v1/collections/\(sticker.id)",
                 method: "PUT",
+                body: body
+            )
+        }
+    }
+
+    // MARK: - Missing rating report
+
+    private func reportMissingRatingIfNeeded() {
+        guard sticker.type == "player", sticker.rating == nil else { return }
+        Task {
+            let body = MissingRatingsRequest(sticker_ids: [sticker.id])
+            let _: CollectionUpdateResponse? = try? await apiClient.request(
+                "/v1/admin/missing-ratings",
+                method: "POST",
                 body: body
             )
         }
