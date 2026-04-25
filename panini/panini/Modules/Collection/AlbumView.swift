@@ -70,7 +70,7 @@ private struct TeamSpread: View {
 
     var body: some View {
         GeometryReader { geo in
-            let cardWidth = (geo.size.width - hPad * 2 - spacing * 3) / 4
+            let cardWidth = max(60, (geo.size.width - hPad * 2 - spacing * 3) / 4)
 
             ZStack(alignment: .top) {
                 // Center binding line — stays fixed while content scrolls beneath
@@ -167,7 +167,7 @@ struct TeamAlbumView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let cardWidth = (geo.size.width - hPad * 2 - spacing * 3) / 4
+            let cardWidth = max(60, (geo.size.width - hPad * 2 - spacing * 3) / 4)
 
             ZStack(alignment: .top) {
                 Rectangle()
@@ -202,7 +202,6 @@ struct TeamAlbumView: View {
         .background(theme.bg)
         .navigationTitle(teamName)
         .navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(for: Sticker.self) { StickerDetailView(sticker: $0) }
     }
 
     private var teamHeader: some View {

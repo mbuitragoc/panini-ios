@@ -57,36 +57,64 @@ final class StickerStore {
         if dirty { try? context.save() }
     }
 
-    /// Seeds SwiftData from the bundled SQLite file if the stickers table is empty.
-    /// Safe to call on every launch — exits immediately if data is already present.
+    /// Seeds SwiftData from the bundled SQLite.
+    /// On first launch inserts everything. On subsequent launches runs an incremental
+    /// merge so catalog updates (new stickers, filled-in player names) are picked up
+    /// without wiping user collection data.
     @MainActor
     func seedIfNeeded(context: ModelContext) {
-        let existing = (try? context.fetchCount(FetchDescriptor<Sticker>())) ?? 0
-        guard existing == 0 else {
+        guard let rows = readBundledSQLite(), !rows.isEmpty else {
             isSeeded = true
             return
         }
 
-        guard let rows = readBundledSQLite() else { return }
+        let existingCount = (try? context.fetchCount(FetchDescriptor<Sticker>())) ?? 0
 
-        for row in rows {
-            context.insert(Sticker(
-                id: row.id,
-                countryCode: row.countryCode,
-                stickerNumber: row.stickerNumber,
-                type: row.type,
-                playerName: row.playerName,
-                club: row.club,
-                clubCountry: row.clubCountry,
-                position: row.position,
-                nationalTeam: row.nationalTeam
-            ))
+        if existingCount == 0 {
+            // Fresh install — insert everything in one pass.
+            for row in rows { context.insert(makeSticker(from: row)) }
+            try? context.save()
+        } else if existingCount != rows.count {
+            // Catalog changed (new stickers added or removed from the bundle).
+            // Insert missing entries; update placeholders that now have a player name.
+            let existing = (try? context.fetch(FetchDescriptor<Sticker>())) ?? []
+            let byID = Dictionary(uniqueKeysWithValues: existing.map { ($0.id, $0) })
+            var dirty = false
+
+            for row in rows {
+                if let sticker = byID[row.id] {
+                    // Fill in player name if it was a placeholder and the catalog now has one.
+                    if sticker.playerName == nil, let name = row.playerName {
+                        sticker.playerName = name
+                        sticker.position   = row.position
+                        sticker.club       = row.club
+                        sticker.clubCountry = row.clubCountry
+                        dirty = true
+                    }
+                } else {
+                    context.insert(makeSticker(from: row))
+                    dirty = true
+                }
+            }
+            if dirty { try? context.save() }
         }
-        try? context.save()
-        isSeeded = true
 
-        // Seed ratings immediately after stickers are committed.
+        isSeeded = true
         seedRatingsIfNeeded(context: context)
+    }
+
+    private func makeSticker(from row: Row) -> Sticker {
+        Sticker(
+            id: row.id,
+            countryCode: row.countryCode,
+            stickerNumber: row.stickerNumber,
+            type: row.type,
+            playerName: row.playerName,
+            club: row.club,
+            clubCountry: row.clubCountry,
+            position: row.position,
+            nationalTeam: row.nationalTeam
+        )
     }
 
     /// Seeds PlayerRating records from the bundled SQLite if none exist yet.

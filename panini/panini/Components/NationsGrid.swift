@@ -1,20 +1,10 @@
 import SwiftUI
 
-// MARK: - World Cup 2026 nations
-
-private let wc2026Nations: [String] = [
-    "ARG", "AUS", "BEL", "BRA", "CMR", "CAN", "CHI", "COL",
-    "CRC", "CRO", "CZE", "DEN", "ECU", "EGY", "ENG", "FRA",
-    "GER", "GHA", "GRE", "HON", "HUN", "IRN", "JPN", "KOR",
-    "MAR", "MEX", "NED", "NGA", "NZL", "PAN", "PAR", "PER",
-    "POL", "POR", "QAT", "ROU", "SAU", "SEN", "SRB", "SVK",
-    "SLO", "ESP", "TUN", "URU", "USA", "UZB", "WAL", "ZIM"
-]
-
 // MARK: - NationsGrid
 
-/// A lazy grid of all 48 World Cup 2026 national team tiles.
-/// Each tile shows the country code and a completion percentage fill bar.
+/// A lazy grid of all World Cup 2026 national team tiles, derived from the
+/// sticker catalog. Excludes the FWC special section. Sorted alphabetically
+/// by country code so ordering is stable and matches the album.
 struct NationsGrid: View {
     let collections: [UserCollection]
     let stickers: [Sticker]
@@ -24,9 +14,19 @@ struct NationsGrid: View {
 
     private let columns = [GridItem(.adaptive(minimum: 72, maximum: 90), spacing: 8)]
 
+    /// Distinct country codes present in the sticker catalog, excluding the
+    /// FWC special section, sorted alphabetically.
+    private var nations: [String] {
+        var seen = Set<String>()
+        return stickers
+            .filter { $0.countryCode != "FWC" }
+            .compactMap { seen.insert($0.countryCode).inserted ? $0.countryCode : nil }
+            .sorted()
+    }
+
     var body: some View {
         LazyVGrid(columns: columns, spacing: 8) {
-            ForEach(wc2026Nations, id: \.self) { code in
+            ForEach(nations, id: \.self) { code in
                 NationTile(
                     code: code,
                     completion: completionRatio(for: code),
