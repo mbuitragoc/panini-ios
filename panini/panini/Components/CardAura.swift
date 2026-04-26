@@ -26,7 +26,9 @@ struct CardAura: View {
 
     var body: some View {
         ZStack {
-            // Layer 2 — Rotating aurora: card-shaped, angular gradient, soft blur
+            // Layer 2 — Rotating aurora: gradient ANGLE rotates, shape stays card-sized.
+            // Using startAngle/endAngle instead of .rotationEffect so the RoundedRectangle
+            // never physically rotates — its corners can't escape the card bounds.
             RoundedRectangle(cornerRadius: cornerRadius)
                 .fill(
                     AngularGradient(
@@ -38,12 +40,13 @@ struct CardAura: View {
                             blue.opacity(0.30),
                             purple.opacity(0.50),
                         ],
-                        center: .center
+                        center: .center,
+                        startAngle: .degrees(auroraAngle),
+                        endAngle:   .degrees(auroraAngle + 360)
                     )
                 )
                 .frame(width: cardWidth + 10, height: cardHeight + 10)
                 .blur(radius: 14)
-                .rotationEffect(.degrees(auroraAngle))
 
             // Layer 1 — Inner glow: pure purple fill, blurred to hug card edges
             RoundedRectangle(cornerRadius: cornerRadius)

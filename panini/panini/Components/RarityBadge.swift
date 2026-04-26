@@ -7,10 +7,11 @@ import SwiftData
 struct RarityBadge: View {
     let rating: PlayerRating
     var iconSize: CGFloat = 12
+    var glintPhase: Double = 12.0   // forwarded to RarityIcon for legendary spike glints
 
     var body: some View {
         HStack(spacing: 6) {
-            RarityIcon(rarity: rating.rarity, size: iconSize)
+            RarityIcon(rarity: rating.rarity, size: iconSize, glintPhase: glintPhase)
             Text(rating.rarity.uppercased())
                 .font(.system(size: 11, weight: .black, design: .monospaced))
                 .foregroundStyle(rating.rarityColor)
@@ -33,6 +34,7 @@ struct RarityBadge: View {
 struct RarityIcon: View {
     let rarity: String
     var size: CGFloat = 16
+    var glintPhase: Double = 12.0   // 0→12 fires sequential spike glints (legendary only)
 
     var body: some View {
         Group {
@@ -197,8 +199,12 @@ struct RarityIcon: View {
                 x: cx - cos(perp) * spikeHW + cos(a) * spikeBase,
                 y: cy - sin(perp) * spikeHW + sin(a) * spikeBase))
             spike.closeSubpath()
+            // Sequential glint: spike i flashes bright as glintPhase sweeps 0→12
+            let d         = glintPhase - Double(i)
+            let flash     = (d >= 0 && d <= 1) ? sin(d * .pi) : 0.0
+            let baseAlpha = i.isMultiple(of: 2) ? 0.95 : 0.65
             ctx.fill(spike, with: .color(
-                Color(hex: "E0C8FF").opacity(i.isMultiple(of: 2) ? 0.95 : 0.65)
+                Color(hex: "E0C8FF").opacity(baseAlpha + (1.0 - baseAlpha) * flash)
             ))
         }
 
