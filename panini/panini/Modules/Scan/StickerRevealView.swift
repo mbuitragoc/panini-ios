@@ -13,6 +13,7 @@ struct StickerRevealView: View {
 
     @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(APIClient.self) private var apiClient
 
     // Backdrop + glow
     @State private var backdropVisible = false
@@ -42,12 +43,16 @@ struct StickerRevealView: View {
     @State private var badgeScale: CGFloat = 0.3    // badge beam-in spring
     @State private var badgeBeamX: CGFloat = -120   // horizontal beam sweep position
     @State private var legendaryGlintPhase: Double = 0  // 0→12 fires sequential spike glints
+    // Unmatched flow
+    @State private var cardFlipAngle: Double = 0    // card flip entrance (unmatched only)
+    @State private var ripplesStart: Date? = nil    // triggers ripple ring TimelineView
 
     private var hasRating: Bool {
         sticker.type == "player" && sticker.rating != nil
     }
 
     private var isLegendary: Bool { sticker.rating?.isLegendary == true }
+    private var isUnmatched: Bool { sticker.type == "player" && sticker.rating == nil }
 
     private var previewCollection: UserCollection {
         UserCollection(userID: "", stickerID: sticker.id, quantityOwned: 1)
@@ -82,6 +87,9 @@ struct StickerRevealView: View {
             crestLayer
                 .allowsHitTesting(false)
 
+            // Unmatched ripple rings
+            rippleLayer
+
             // Legendary particle burst
             if sticker.rating?.isLegendary == true {
                 ParticleField(
@@ -112,6 +120,7 @@ struct StickerRevealView: View {
                 }
                 .scaleEffect(cardVisible ? 1 : 0.2)
                 .opacity(cardVisible ? 1 : 0)
+                .rotation3DEffect(.degrees(cardFlipAngle), axis: (x: 0, y: 1, z: 0), perspective: 1.0)
 
                 playerName
                     .opacity(nameVisible ? 1 : 0)
@@ -245,6 +254,41 @@ struct StickerRevealView: View {
         )
     }
 
+    // MARK: - Ripple layer (unmatched flow)
+
+    @ViewBuilder
+    private var rippleLayer: some View {
+        if let start = ripplesStart {
+            TimelineView(.animation) { tl in
+                Canvas { ctx, sz in
+                    let elapsed = tl.date.timeIntervalSince(start)
+                    let cx = sz.width / 2
+                    let cy = sz.height * 0.38   // matches card vertical position
+                    let baseR: CGFloat = 108    // card half-width + small margin
+                    let ringColor = teamColors.first ?? Color.white
+
+                    for i in 0..<3 {
+                        let t = elapsed - Double(i) * 0.28
+                        guard t > 0 else { continue }
+                        let duration = 1.2
+                        guard t < duration else { continue }
+
+                        let progress = CGFloat(t / duration)
+                        let r = baseR * (1.0 + progress * 1.6)
+                        let alpha = max(0.0, 1.0 - progress) * 0.55
+                        ctx.stroke(
+                            Path(ellipseIn: CGRect(x: cx - r, y: cy - r, width: r * 2, height: r * 2)),
+                            with: .color(ringColor.opacity(alpha)),
+                            lineWidth: 1.5
+                        )
+                    }
+                }
+            }
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+        }
+    }
+
     private var confirmButton: some View {
         Button(action: onConfirm) {
             Text("Add to collection")
@@ -261,9 +305,51 @@ struct StickerRevealView: View {
     private func runSequence() async {
         if reduceMotion {
             await runReducedMotionSequence()
+        } else if isUnmatched {
+            await runUnmatchedSequence()
         } else {
             await runFullSequence()
         }
+    }
+
+    private func runUnmatchedSequence() async {
+        // 1. Dark backdrop
+        withAnimation(.easeOut(duration: 0.25)) { backdropVisible = true }
+
+        // 2. Country crest — same entrance as the matched flow, shorter hold
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        withAnimation(.easeOut(duration: 0.6)) { glowVisible = true }
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+            crestScale   = 1.0
+            crestOpacity = 1.0
+        }
+        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+        try? await Task.sleep(nanoseconds: 700_000_000)
+
+        // 3. Card flip in from edge; crest exits simultaneously + ripples
+        cardFlipAngle = 90
+        cardVisible   = true
+        withAnimation(.easeIn(duration: 0.25)) { crestScale = 0.3; crestOpacity = 0 }
+        withAnimation(.spring(response: 0.55, dampingFraction: 0.68)) { cardFlipAngle = 0 }
+        ripplesStart = .now
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+
+        // 4. Name
+        try? await Task.sleep(nanoseconds: 500_000_000)
+        withAnimation(.easeOut(duration: 0.35)) { nameVisible = true }
+
+        try? await Task.sleep(nanoseconds: 200_000_000)
+
+        // 5. Position / national team label
+        withAnimation(.easeOut(duration: 0.30)) { positionVisible = true }
+
+        try? await Task.sleep(nanoseconds: 300_000_000)
+
+        // 6. CTA
+        withAnimation(.easeOut(duration: 0.30)) { buttonVisible = true }
+
+        // 7. Report missing rating — fire-and-forget
+        Task { await apiClient.reportMissingRatings([sticker.id]) }
     }
 
     private func runFullSequence() async {
@@ -466,6 +552,7 @@ struct StickerRevealView: View {
 
     return StickerRevealView(sticker: sticker, onConfirm: {})
         .modelContainer(container)
+        .environment(APIClient())
 }
 
 #Preview("Legendary — Mbappe") {
@@ -489,6 +576,7 @@ struct StickerRevealView: View {
 
     return StickerRevealView(sticker: sticker, onConfirm: {})
         .modelContainer(container)
+        .environment(APIClient())
 }
 
 #Preview("No rating — placeholder") {
@@ -503,6 +591,7 @@ struct StickerRevealView: View {
 
     return StickerRevealView(sticker: sticker, onConfirm: {})
         .modelContainer(container)
+        .environment(APIClient())
 }
 
 #Preview("Badge sticker") {
@@ -516,4 +605,5 @@ struct StickerRevealView: View {
 
     return StickerRevealView(sticker: sticker, onConfirm: {})
         .modelContainer(container)
+        .environment(APIClient())
 }

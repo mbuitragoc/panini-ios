@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UIKit
 
 // MARK: - ScanConfirmView
 
@@ -200,19 +201,44 @@ struct ScanConfirmView: View {
     // MARK: - Duplicate feedback screen
 
     private var duplicateFeedback: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 0) {
             Spacer()
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 52))
-                .foregroundStyle(theme.success)
-            Text("Already in your collection — duplicate added")
-                .bodyStyle(size: 16, weight: .medium)
-                .foregroundStyle(theme.ink)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
+
+            if let s = sticker {
+                let count = s.collection?.quantityOwned ?? 2
+                let preview = UserCollection(userID: "", stickerID: s.id, quantityOwned: count)
+
+                StickerCard(sticker: s, collection: preview, width: 150)
+                    .padding(.bottom, 28)
+
+                Text("×\(count)")
+                    .font(.system(size: 64, weight: .black, design: .monospaced))
+                    .foregroundStyle(theme.ink)
+
+                if let name = s.playerName {
+                    Text(name)
+                        .bodyStyle(size: 17, weight: .medium)
+                        .foregroundStyle(theme.inkSoft)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                        .padding(.top, 6)
+                }
+
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.left.arrow.right")
+                    Text("Now available to trade")
+                }
+                .bodyStyle(size: 14, weight: .medium)
+                .foregroundStyle(theme.inkMuted)
+                .padding(.top, 12)
+            }
+
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        }
     }
 
     // MARK: - Not found
@@ -260,7 +286,7 @@ struct ScanConfirmView: View {
             syncEngine.syncAfterWrite(context: context)
 
             withAnimation { duplicateAdded = true }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { dismiss() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) { dismiss() }
         } else {
             if revealsEnabled {
                 revealSticker = s

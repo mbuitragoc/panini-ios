@@ -81,6 +81,21 @@ final class APIClient {
     ///   - method: HTTP method (e.g. "GET", "POST").
     ///   - body: Optional `Encodable` payload sent as JSON.
     /// - Throws: `APIError.unauthorized` on 401 (also clears the stored token).
+    /// Fires POST /v1/admin/missing-ratings — returns 204, so no decoding needed.
+    /// Fire-and-forget: errors are silently swallowed.
+    func reportMissingRatings(_ stickerIDs: [String]) async {
+        guard !stickerIDs.isEmpty,
+              let url = URL(string: baseURL + "/v1/admin/missing-ratings") else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let token = authToken {
+            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        req.httpBody = try? encoder.encode(["sticker_ids": stickerIDs])
+        _ = try? await URLSession.shared.data(for: req)
+    }
+
     func request<T: Decodable>(
         _ endpoint: String,
         method: String = "GET",
