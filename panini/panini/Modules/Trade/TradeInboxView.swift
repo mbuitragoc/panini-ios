@@ -23,6 +23,9 @@ struct TradeInboxView: View {
 
     @State private var selectedTab: InboxTab = .received
     @State private var selectedTrade: Trade?
+    @State private var acceptTrigger  = false
+    @State private var declineTrigger = false
+    @State private var confirmTrigger = false
 
     private var myID: String { authService.currentUserID ?? "" }
 
@@ -82,6 +85,9 @@ struct TradeInboxView: View {
         .navigationDestination(item: $selectedTrade) { trade in
             TradeDetailView(trade: trade, myID: myID)
         }
+        .sensoryFeedback(.impact(weight: .medium), trigger: acceptTrigger)
+        .sensoryFeedback(.impact(weight: .light),  trigger: declineTrigger)
+        .sensoryFeedback(.impact(weight: .heavy),  trigger: confirmTrigger)
         .refreshable { await syncEngine.sync(context: context) }
         .task {
             // Sync immediately on appear, then every 15 s while the view is on screen.
@@ -154,6 +160,12 @@ struct TradeInboxView: View {
     // MARK: - Action handler
 
     private func handle(_ trade: Trade, _ action: TradeAction) {
+        // Fire haptic immediately on the main thread before the network call
+        switch action {
+        case .accept:  acceptTrigger.toggle()
+        case .decline: declineTrigger.toggle()
+        case .confirm: confirmTrigger.toggle()
+        }
         Task {
             do {
                 switch action {

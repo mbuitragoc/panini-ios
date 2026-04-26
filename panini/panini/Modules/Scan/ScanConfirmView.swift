@@ -22,6 +22,7 @@ struct ScanConfirmView: View {
     @State private var revealSticker: Sticker? = nil
     @State private var duplicateAdded = false
     @State private var showManualAdd = false
+    @State private var stickerAddedTrigger = false
 
     // MARK: - Derived state
 
@@ -74,6 +75,7 @@ struct ScanConfirmView: View {
                 })
                 .navigationBarBackButtonHidden()
             }
+            .sensoryFeedback(.impact(weight: .medium), trigger: stickerAddedTrigger)
         }
     }
 
@@ -292,6 +294,7 @@ struct ScanConfirmView: View {
                 revealSticker = s
             } else {
                 actualSave(s)
+                stickerAddedTrigger.toggle()
                 dismiss()
             }
         }
